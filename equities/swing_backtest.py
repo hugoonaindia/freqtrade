@@ -5,11 +5,11 @@ import math
 from .strategies import decide, rotation
 
 
-def simulate_swing(histories, config, strategy):  # noqa: C901 - Ordered daily fills share portfolio state.
+def simulate_swing(histories, config, strategy, *, _prepared=None):  # noqa: C901 - Ordered daily fills share portfolio state.
     from .backtest import Portfolio, past_bars, prepare, session_date
     from .strategies import STRATEGIES
 
-    universe, days = prepare(histories, config, STRATEGIES[strategy]["bars"])
+    universe, days = _prepared or prepare(histories, config, STRATEGIES[strategy]["bars"])
     portfolio = Portfolio(config)
     stops = {}
     tripped = None
@@ -40,11 +40,12 @@ def simulate_swing(histories, config, strategy):  # noqa: C901 - Ordered daily f
             if bar["l"] <= stops[symbol]:
                 exit_position(symbol, day, min(bar["o"], stops[symbol]), "position_stop")
                 stopped.add(symbol)
-        past = {symbol: past_bars(bars, day) for symbol, bars in universe.items()}
+        limit = None if strategy == "macd" else STRATEGIES[strategy]["bars"]
+        past = {symbol: past_bars(bars, day, limit) for symbol, bars in universe.items()}
         decisions = (
-            rotation(past)
+            rotation(past, _validated=True)
             if strategy == "momentum"
-            else {symbol: decide(strategy, bars) for symbol, bars in past.items()}
+            else {symbol: decide(strategy, bars, _validated=True) for symbol, bars in past.items()}
         )
         spendable = portfolio.cash
         allocation = (portfolio.curve[-1]["equity"] if portfolio.curve else config.capital) / (

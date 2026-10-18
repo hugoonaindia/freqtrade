@@ -83,13 +83,16 @@ def ema(values, period):
     return out
 
 
-def decide(strategy, data):
+def decide(strategy, data, *, _validated=False):
     if strategy not in STRATEGIES:
         raise ValueError("Estrategia desconocida.")
     minimum = STRATEGIES[strategy]["bars"]
-    if not valid(data, minimum, ohlc=strategy == "breakout"):
+    if len(data) < minimum or (
+        not _validated and not valid(data, minimum, ohlc=strategy == "breakout")
+    ):
         return result("hold", f"Faltan {minimum} sesiones válidas o hay datos inválidos")
-    closes = [float(bar["c"]) for bar in data]
+    window = data if strategy == "macd" else data[-minimum:]
+    closes = [float(bar["c"]) for bar in window]
     if strategy == "sma":
         previous = fmean(closes[-6:-1]) - fmean(closes[-21:-1])
         current = fmean(closes[-5:]) - fmean(closes[-20:])
@@ -107,9 +110,10 @@ def decide(strategy, data):
         previous = closes[-21:-1]
         current = closes[-20:]
         lower_before = fmean(previous) - 2 * pstdev(previous)
-        lower_now = fmean(current) - 2 * pstdev(current)
+        current_mean, current_std = fmean(current), pstdev(current)
+        lower_now = current_mean - 2 * current_std
         # Exit at the middle band takes precedence over an overshooting recovery.
-        if closes[-1] >= fmean(current) and pstdev(current) > 0:
+        if closes[-1] >= current_mean and current_std > 0:
             return result("sell", "Cierre alcanza media de Bollinger")
         if closes[-2] < lower_before and closes[-1] >= lower_now:
             return result("buy", "Cierre recupera banda inferior 20/2")
@@ -129,15 +133,15 @@ def decide(strategy, data):
     return result("hold", "Momentum requiere comparar universo completo")
 
 
-def rotation(universe):
-    if not universe or any(not valid(data, 64) for data in universe.values()):
+def rotation(universe, *, _validated=False):
+    if not universe or any(
+        len(data) < 64 or (not _validated and not valid(data, 64)) for data in universe.values()
+    ):
         return {symbol: result("hold", "Universo incompleto; sin rotación") for symbol in universe}
     try:
         windows = [
             tuple(
-                datetime.fromisoformat(bar["t"].replace("Z", "+00:00"))
-                .astimezone(ZoneInfo("America/New_York"))
-                .date()
+                datetime.fromisoformat(bar["t"]).astimezone(ZoneInfo("America/New_York")).date()
                 for bar in data[-64:]
             )
             for data in universe.values()

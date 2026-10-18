@@ -37,3 +37,14 @@ user_data/
 .vscode
 .*_cache/
 .ipynb_checkpoints
+
+# Generated documentation and local-only runtime files are not part of the image.
+en/
+archive/
+tests_equities/
+.secrets/
+.equities-state/
+.macos-build/
+settings.json
+**/__pycache__/
+*.pyc

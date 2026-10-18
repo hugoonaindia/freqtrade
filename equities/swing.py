@@ -185,7 +185,8 @@ class SwingEngine(Engine):
             ):
                 del self.campaign["closing"][symbol]
                 self._persist()
-        market_open = self.broker.get("/v2/clock")["is_open"]
+        clock = self.broker.get("/v2/clock")
+        market_open = clock["is_open"]
         for order in orders:
             if order["side"] == "buy" and not self.entries_enabled:
                 self.broker.delete("/v2/orders/" + order["id"])
@@ -255,6 +256,11 @@ class SwingEngine(Engine):
                 )
                 self._event(f"{symbol}: protección 2% solicitada en Alpaca.")
             raise ValueError("Protección pendiente de confirmación; entradas bloqueadas.")
+
+        if not self.campaign.get("closing"):
+            # Reuse this cycle's fresh reads only when reconciliation made no broker writes.
+            return {"account": account, "positions": positions, "orders": orders, "clock": clock}
+        return None
 
     def _liquidate(self):
         orders = self._orders()
@@ -334,15 +340,16 @@ class SwingEngine(Engine):
             return super()._cycle(False)
         if not self.entries_enabled or not self.campaign:
             return [{"status": "Autonomía en pausa; activa GO PAPER para iniciar."}]
-        self._monitor_locked()
+        snapshot = self._monitor_locked()
         if self.campaign["tripped"]:
             return [{"status": "Límite global alcanzado; campaña bloqueada."}]
-        clock = self.broker.get("/v2/clock")
+        clock = snapshot["clock"] if snapshot else self.broker.get("/v2/clock")
         if not clock["is_open"]:
             return [{"status": "Mercado cerrado; conserva posiciones y stops GTC."}]
-        account = self._account()
-        orders = self._orders()
-        positions = {p["symbol"]: p for p in self.broker.get("/v2/positions")}
+        account = snapshot["account"] if snapshot else self._account()
+        orders = snapshot["orders"] if snapshot else self._orders()
+        position_rows = snapshot["positions"] if snapshot else self.broker.get("/v2/positions")
+        positions = {p["symbol"]: p for p in position_rows}
         session = completed_session(self.broker, clock)
         today = datetime.fromisoformat(clock["timestamp"]).date()
         universe = {}

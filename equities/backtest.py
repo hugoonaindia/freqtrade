@@ -2,6 +2,8 @@
 
 import math
 import re
+from bisect import bisect_left
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -49,6 +51,24 @@ def session_date(bar):
     return stamp.astimezone(NY).date().isoformat()
 
 
+class SessionHistory(Mapping):
+    """Validated history with an immutable date index for repeated window lookups."""
+
+    def __init__(self, values):
+        self._values = dict(values)
+        self.dates = tuple(sorted(values))
+        self.bars = tuple(values[stamp] for stamp in self.dates)
+
+    def __getitem__(self, key):
+        return self._values[key]
+
+    def __iter__(self):
+        return iter(self._values)
+
+    def __len__(self):
+        return len(self._values)
+
+
 def prepare(histories, config, minimum):
     if not 1 <= len(histories) <= 8:
         raise ValueError("Elige entre 1 y 8 símbolos.")
@@ -79,7 +99,7 @@ def prepare(histories, config, minimum):
             )
         if sum(day < days[0] for day in by_date) < minimum:
             raise ValueError(f"{symbol}: faltan {minimum} sesiones previas de calentamiento.")
-        prepared[symbol] = by_date
+        prepared[symbol] = SessionHistory(by_date)
         sessions = days
     if len(sessions) < 2:
         raise ValueError("Se necesitan al menos dos sesiones de evaluación.")
@@ -149,26 +169,34 @@ class Portfolio:
         }
 
 
-def past_bars(by_date, day):
+def past_bars(by_date, day, limit=None):
     start = (date.fromisoformat(day) - timedelta(days=400)).isoformat()
-    return [by_date[stamp] for stamp in sorted(by_date) if start <= stamp < day]
+    if isinstance(by_date, SessionHistory):
+        left = bisect_left(by_date.dates, start)
+        right = bisect_left(by_date.dates, day)
+        if limit is not None:
+            left = max(left, right - limit)
+        return list(by_date.bars[left:right])
+    values = [by_date[stamp] for stamp in sorted(by_date) if start <= stamp < day]
+    return values[-limit:] if limit is not None else values
 
 
-def simulate(histories, config, strategy):
+def simulate(histories, config, strategy, *, _prepared=None):
     if strategy not in STRATEGIES:
         raise ValueError("Estrategia desconocida.")
     if config.profile == "swing":
         from .swing_backtest import simulate_swing
 
-        return simulate_swing(histories, config, strategy)
-    universe, days = prepare(histories, config, STRATEGIES[strategy]["bars"])
+        return simulate_swing(histories, config, strategy, _prepared=_prepared)
+    universe, days = _prepared or prepare(histories, config, STRATEGIES[strategy]["bars"])
     portfolio = Portfolio(config)
     for day in days:
-        past = {symbol: past_bars(data, day) for symbol, data in universe.items()}
+        limit = None if strategy == "macd" else STRATEGIES[strategy]["bars"]
+        past = {symbol: past_bars(data, day, limit) for symbol, data in universe.items()}
         decisions = (
-            rotation(past)
+            rotation(past, _validated=True)
             if strategy == "momentum"
-            else {symbol: decide(strategy, data) for symbol, data in past.items()}
+            else {symbol: decide(strategy, data, _validated=True) for symbol, data in past.items()}
         )
         # Snapshot cash and positions: same cycle cannot reinvest unconfirmed sale proceeds.
         spendable = portfolio.cash
@@ -214,7 +242,7 @@ def buy_hold(universe, days, config, fully_invested):
 def regimes(universe, days):
     labels = []
     for day in days:
-        past = [past_bars(data, day) for data in universe.values()]
+        past = [past_bars(data, day, 21) for data in universe.values()]
         if any(len(values) < 21 for values in past):
             labels.append("unclassified")
             continue
@@ -230,7 +258,9 @@ def compare(histories, config):
         for key, full in [("allocated", False), ("fully_invested", True)]
     }
     labels = regimes(universe, days)
-    strategies = {key: simulate(histories, config, key) for key in STRATEGIES}
+    strategies = {
+        key: simulate(histories, config, key, _prepared=(universe, days)) for key in STRATEGIES
+    }
     for report in [*benchmarks.values(), *strategies.values()]:
         report["regimes"] = grouped_returns(report["curve"], config.capital, labels)
         report["years"] = grouped_returns(report["curve"], config.capital, [d[:4] for d in days])

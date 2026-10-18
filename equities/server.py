@@ -10,6 +10,7 @@ from pathlib import Path
 from .automation import Automation
 from .backtest_jobs import BacktestJobs
 from .controls import Controls
+from .dashboard_reader import DashboardReader
 from .engine import SelectionChanged
 from .strategies import STRATEGIES
 
@@ -19,6 +20,16 @@ def make_server(broker, engine, port, auto=False, automation=None, backtests=Non
     backtests = backtests or BacktestJobs()
     controls = controls or Controls(engine, automation)
     token = secrets.token_urlsafe(32)
+    reader = DashboardReader(broker)
+    assets = {
+        route: Path(__file__).with_name(filename).read_text(encoding="utf-8")
+        for route, filename in [
+            ("/", "dashboard.html"),
+            ("/dashboard.js", "dashboard_ui.js"),
+            ("/backtest.js", "backtest_ui.js"),
+        ]
+    }
+    assets["/"] = assets["/"].replace("__TOKEN__", token)
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
@@ -44,7 +55,7 @@ def make_server(broker, engine, port, auto=False, automation=None, backtests=Non
         def allowed_host(self):
             return self.headers.get("Host") == f"127.0.0.1:{self.server.server_port}"
 
-        def do_GET(self):  # noqa: C901 - Local read routes and broker status.
+        def do_GET(self):
             if not self.allowed_host():
                 return self.send(403, {"error": "Host no permitido"})
             settings = {}
@@ -59,21 +70,9 @@ def make_server(broker, engine, port, auto=False, automation=None, backtests=Non
                             "desktop": bool(getattr(sys, "frozen", False)),
                         },
                     )
-                if self.path == "/":
-                    html = Path(__file__).with_name("dashboard.html").read_text(encoding="utf-8")
-                    return self.send(200, html.replace("__TOKEN__", token), "text/html")
-                if self.path == "/dashboard.js":
-                    return self.send(
-                        200,
-                        Path(__file__).with_name("dashboard_ui.js").read_text(encoding="utf-8"),
-                        "text/javascript",
-                    )
-                if self.path == "/backtest.js":
-                    return self.send(
-                        200,
-                        Path(__file__).with_name("backtest_ui.js").read_text(encoding="utf-8"),
-                        "text/javascript",
-                    )
+                if self.path in assets:
+                    content_type = "text/html" if self.path == "/" else "text/javascript"
+                    return self.send(200, assets[self.path], content_type)
                 if self.path == "/api/backtest":
                     return self.send(200, backtests.status())
                 if self.path.startswith("/api/backtest/result/"):
@@ -104,7 +103,8 @@ def make_server(broker, engine, port, auto=False, automation=None, backtests=Non
                             "setup_message": "Faltan claves Alpaca Paper. Consulta docs/alpaca.md.",
                         },
                     )
-                account = broker.get("/v2/account")
+                snapshot = reader.load()
+                account = snapshot["account"]
                 return self.send(
                     200,
                     {
@@ -122,11 +122,10 @@ def make_server(broker, engine, port, auto=False, automation=None, backtests=Non
                                 "trading_blocked",
                             )
                         },
-                        "clock": broker.get("/v2/clock"),
-                        "positions": broker.get("/v2/positions"),
-                        "orders": controls.visible_orders(
-                            broker.get("/v2/orders", status="all", limit=100, direction="desc")
-                        ),
+                        "clock": snapshot["clock"],
+                        "received_at": snapshot["received_at"],
+                        "positions": snapshot["positions"],
+                        "orders": controls.visible_orders(snapshot["orders"]),
                         "history_since": controls.history_since,
                         **settings,
                         "last": engine.last,
@@ -241,4 +240,11 @@ def make_server(broker, engine, port, auto=False, automation=None, backtests=Non
                     {"error": "Ciclo detenido. Comprueba órdenes en Alpaca antes de reintentar."},
                 )
 
-    return ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    class DashboardServer(ThreadingHTTPServer):
+        def server_close(self):
+            try:
+                super().server_close()
+            finally:
+                reader.close()
+
+    return DashboardServer(("127.0.0.1", port), Handler)
