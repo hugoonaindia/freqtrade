@@ -277,6 +277,8 @@ class Exchange(LoggingMixin):
             not self._ft_has["always_require_api_keys"] and self._config.get("dry_run", False),
         )
         self.log_responses = exchange_conf.get("log_responses", False)
+        if self.log_responses:
+            logger.info("Logging of exchange responses is enabled.")
 
         # Assign this directly for easy access
         self._ohlcv_partial_candle = self._ft_has["ohlcv_partial_candle"]
@@ -4029,6 +4031,7 @@ class Exchange(LoggingMixin):
         leverage: float,
         pair: str | None = None,
         accept_fail: bool = False,
+        params: dict | None = None,
     ):
         """
         Set's the leverage before making a trade, in order to not
@@ -4041,7 +4044,7 @@ class Exchange(LoggingMixin):
             # Rounding for binance ...
             leverage = floor(leverage)
         try:
-            res = self._api.set_leverage(symbol=pair, leverage=leverage)
+            res = self._api.set_leverage(symbol=pair, leverage=leverage, params=params or {})
             self._log_exchange_response("set_leverage", res)
         except ccxt.DDoSProtection as e:
             raise DDosProtection(e) from e
@@ -4329,7 +4332,9 @@ class Exchange(LoggingMixin):
         else:
             positions = self.fetch_positions(pair)
             if len(positions) > 0:
-                pos = positions[0]
+                # Hedge mode accounts may return a position per side.
+                side = "short" if is_short else "long"
+                pos = next((p for p in positions if p.get("side") == side), positions[0])
                 liquidation_price = pos["liquidationPrice"]
 
         if liquidation_price is not None:
