@@ -1,0 +1,516 @@
+[
+  {
+    "version": "develop",
+    "title": "develop",
+    "aliases": [
+      "latest"
+    ]
+  },
+  {
+    "version": "2026.9",
+    "title": "2026.9",
+    "aliases": [
+      "stable"
+    ]
+  },
+  {
+    "version": "2026.8",
+    "title": "2026.8",
+    "aliases": []
+  },
+  {
+    "version": "2026.7",
+    "title": "2026.7",
+    "aliases": []
+  },
+  {
+    "version": "2026.6",
+    "title": "2026.6",
+    "aliases": []
+  },
+  {
+    "version": "2026.5.1",
+    "title": "2026.5.1",
+    "aliases": []
+  },
+  {
+    "version": "2026.5",
+    "title": "2026.5",
+    "aliases": []
+  },
+  {
+    "version": "2026.4",
+    "title": "2026.4",
+    "aliases": []
+  },
+  {
+    "version": "2026.3",
+    "title": "2026.3",
+    "aliases": []
+  },
+  {
+    "version": "2026.2",
+    "title": "2026.2",
+    "aliases": []
+  },
+  {
+    "version": "2026.1",
+    "title": "2026.1",
+    "aliases": []
+  },
+  {
+    "version": "2025.12",
+    "title": "2025.12",
+    "aliases": []
+  },
+  {
+    "version": "2025.11.2",
+    "title": "2025.11.2",
+    "aliases": []
+  },
+  {
+    "version": "2025.11.1",
+    "title": "2025.11.1",
+    "aliases": []
+  },
+  {
+    "version": "2025.11",
+    "title": "2025.11",
+    "aliases": []
+  },
+  {
+    "version": "2025.10",
+    "title": "2025.10",
+    "aliases": []
+  },
+  {
+    "version": "2025.9.1",
+    "title": "2025.9.1",
+    "aliases": []
+  },
+  {
+    "version": "2025.9",
+    "title": "2025.9",
+    "aliases": []
+  },
+  {
+    "version": "2025.8",
+    "title": "2025.8",
+    "aliases": []
+  },
+  {
+    "version": "2025.7",
+    "title": "2025.7",
+    "aliases": []
+  },
+  {
+    "version": "2025.6",
+    "title": "2025.6",
+    "aliases": []
+  },
+  {
+    "version": "2025.5",
+    "title": "2025.5",
+    "aliases": []
+  },
+  {
+    "version": "2025.4",
+    "title": "2025.4",
+    "aliases": []
+  },
+  {
+    "version": "2025.3",
+    "title": "2025.3",
+    "aliases": []
+  },
+  {
+    "version": "2025.2",
+    "title": "2025.2",
+    "aliases": []
+  },
+  {
+    "version": "2025.1",
+    "title": "2025.1",
+    "aliases": []
+  },
+  {
+    "version": "2024.12.1",
+    "title": "2024.12.1",
+    "aliases": []
+  },
+  {
+    "version": "2024.12",
+    "title": "2024.12",
+    "aliases": []
+  },
+  {
+    "version": "2024.11",
+    "title": "2024.11",
+    "aliases": []
+  },
+  {
+    "version": "2024.10",
+    "title": "2024.10",
+    "aliases": []
+  },
+  {
+    "version": "2024.9",
+    "title": "2024.9",
+    "aliases": []
+  },
+  {
+    "version": "2024.8",
+    "title": "2024.8",
+    "aliases": []
+  },
+  {
+    "version": "2024.7.1",
+    "title": "2024.7.1",
+    "aliases": []
+  },
+  {
+    "version": "2024.7",
+    "title": "2024.7",
+    "aliases": []
+  },
+  {
+    "version": "2024.6",
+    "title": "2024.6",
+    "aliases": []
+  },
+  {
+    "version": "2024.5",
+    "title": "2024.5",
+    "aliases": []
+  },
+  {
+    "version": "2024.4",
+    "title": "2024.4",
+    "aliases": []
+  },
+  {
+    "version": "2024.3",
+    "title": "2024.3",
+    "aliases": []
+  },
+  {
+    "version": "2024.2",
+    "title": "2024.2",
+    "aliases": []
+  },
+  {
+    "version": "2024.1",
+    "title": "2024.1",
+    "aliases": []
+  },
+  {
+    "version": "2023.12",
+    "title": "2023.12",
+    "aliases": []
+  },
+  {
+    "version": "2023.11",
+    "title": "2023.11",
+    "aliases": []
+  },
+  {
+    "version": "2023.10",
+    "title": "2023.10",
+    "aliases": []
+  },
+  {
+    "version": "2023.9",
+    "title": "2023.9",
+    "aliases": []
+  },
+  {
+    "version": "2023.8",
+    "title": "2023.8",
+    "aliases": []
+  },
+  {
+    "version": "2023.7",
+    "title": "2023.7",
+    "aliases": []
+  },
+  {
+    "version": "2023.6",
+    "title": "2023.6",
+    "aliases": []
+  },
+  {
+    "version": "2023.5.1",
+    "title": "2023.5.1",
+    "aliases": []
+  },
+  {
+    "version": "2023.5",
+    "title": "2023.5",
+    "aliases": []
+  },
+  {
+    "version": "2023.4",
+    "title": "2023.4",
+    "aliases": []
+  },
+  {
+    "version": "2023.3",
+    "title": "2023.3",
+    "aliases": []
+  },
+  {
+    "version": "2023.2",
+    "title": "2023.2",
+    "aliases": []
+  },
+  {
+    "version": "2023.1",
+    "title": "2023.1",
+    "aliases": []
+  },
+  {
+    "version": "2022.12",
+    "title": "2022.12",
+    "aliases": []
+  },
+  {
+    "version": "2022.11",
+    "title": "2022.11",
+    "aliases": []
+  },
+  {
+    "version": "2022.10",
+    "title": "2022.10",
+    "aliases": []
+  },
+  {
+    "version": "2022.9.1",
+    "title": "2022.9.1",
+    "aliases": []
+  },
+  {
+    "version": "2022.9",
+    "title": "2022.9",
+    "aliases": []
+  },
+  {
+    "version": "2022.8",
+    "title": "2022.8",
+    "aliases": []
+  },
+  {
+    "version": "2022.7",
+    "title": "2022.7",
+    "aliases": []
+  },
+  {
+    "version": "2022.6",
+    "title": "2022.6",
+    "aliases": []
+  },
+  {
+    "version": "2022.5.1",
+    "title": "2022.5.1",
+    "aliases": []
+  },
+  {
+    "version": "2022.5",
+    "title": "2022.5",
+    "aliases": []
+  },
+  {
+    "version": "2022.4.2",
+    "title": "2022.4.2",
+    "aliases": []
+  },
+  {
+    "version": "2022.4.1",
+    "title": "2022.4.1",
+    "aliases": []
+  },
+  {
+    "version": "2022.3",
+    "title": "2022.3",
+    "aliases": []
+  },
+  {
+    "version": "2022.2.2",
+    "title": "2022.2.2",
+    "aliases": []
+  },
+  {
+    "version": "2022.2.1",
+    "title": "2022.2.1",
+    "aliases": []
+  },
+  {
+    "version": "2022.2",
+    "title": "2022.2",
+    "aliases": []
+  },
+  {
+    "version": "2022.1",
+    "title": "2022.1",
+    "aliases": []
+  },
+  {
+    "version": "2021.12",
+    "title": "2021.12",
+    "aliases": []
+  },
+  {
+    "version": "2021.11",
+    "title": "2021.11",
+    "aliases": []
+  },
+  {
+    "version": "2021.10",
+    "title": "2021.10",
+    "aliases": []
+  },
+  {
+    "version": "2021.9",
+    "title": "2021.9",
+    "aliases": []
+  },
+  {
+    "version": "2021.8",
+    "title": "2021.8",
+    "aliases": []
+  },
+  {
+    "version": "2021.7",
+    "title": "2021.7",
+    "aliases": []
+  },
+  {
+    "version": "2021.6",
+    "title": "2021.6",
+    "aliases": []
+  },
+  {
+    "version": "2021.5",
+    "title": "2021.5",
+    "aliases": []
+  },
+  {
+    "version": "2021.4",
+    "title": "2021.4",
+    "aliases": []
+  },
+  {
+    "version": "2021.3",
+    "title": "2021.3",
+    "aliases": []
+  },
+  {
+    "version": "2021.2",
+    "title": "2021.2",
+    "aliases": []
+  },
+  {
+    "version": "2021.1",
+    "title": "2021.1",
+    "aliases": []
+  },
+  {
+    "version": "2020.12",
+    "title": "2020.12",
+    "aliases": []
+  },
+  {
+    "version": "2020.11",
+    "title": "2020.11",
+    "aliases": []
+  },
+  {
+    "version": "2020.10",
+    "title": "2020.10",
+    "aliases": []
+  },
+  {
+    "version": "2020.9.1",
+    "title": "2020.9.1",
+    "aliases": []
+  },
+  {
+    "version": "2020.9",
+    "title": "2020.9",
+    "aliases": []
+  },
+  {
+    "version": "2020.8",
+    "title": "2020.8",
+    "aliases": []
+  },
+  {
+    "version": "2020.7",
+    "title": "2020.7",
+    "aliases": []
+  },
+  {
+    "version": "2020.6",
+    "title": "2020.6",
+    "aliases": []
+  },
+  {
+    "version": "2020.5",
+    "title": "2020.5",
+    "aliases": []
+  },
+  {
+    "version": "2020.4",
+    "title": "2020.4",
+    "aliases": []
+  },
+  {
+    "version": "2020.3",
+    "title": "2020.3",
+    "aliases": []
+  },
+  {
+    "version": "2020.02",
+    "title": "2020.02",
+    "aliases": []
+  },
+  {
+    "version": "2020.01",
+    "title": "2020.01",
+    "aliases": []
+  },
+  {
+    "version": "2019.11",
+    "title": "2019.11",
+    "aliases": []
+  },
+  {
+    "version": "2019.10",
+    "title": "2019.10",
+    "aliases": []
+  },
+  {
+    "version": "2019.9",
+    "title": "2019.9",
+    "aliases": []
+  },
+  {
+    "version": "2019.8-1",
+    "title": "2019.8-1",
+    "aliases": []
+  },
+  {
+    "version": "2019.8",
+    "title": "2019.8",
+    "aliases": []
+  },
+  {
+    "version": "2019.7",
+    "title": "2019.7",
+    "aliases": []
+  },
+  {
+    "version": "2019.6",
+    "title": "2019.6",
+    "aliases": []
+  }
+]
