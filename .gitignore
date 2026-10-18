@@ -122,3 +122,10 @@ target/
 !config_examples/config_freqai.example.json
 
 docker-compose-*.yml
+
+.secrets/
+.equities-state/
+
+.macos-build/
+
+/settings.json
