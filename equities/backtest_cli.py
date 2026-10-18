@@ -18,6 +18,7 @@ def main():
     parser.add_argument("--end", required=True)
     parser.add_argument("--capital", type=float, default=10000)
     parser.add_argument("--budget", type=float, default=500)
+    parser.add_argument("--profile", choices=("budget", "swing"), default="budget")
     parser.add_argument("--fee-bps", type=float, default=5)
     parser.add_argument("--slippage-bps", type=float, default=5)
     parser.add_argument("--output", default=".equities-state/backtest.json")
@@ -35,7 +36,7 @@ def main():
         report = compare(data, config)
         target = Path(args.output)
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(json.dumps(report, ensure_ascii=False, allow_nan=False))
+        target.write_text(json.dumps(report, ensure_ascii=False, allow_nan=False), encoding="utf-8")
         print("Estrategia | Retorno % | Caída máxima % | Reducción caída (pp)")
         for name, row in report["strategies"].items():
             print(

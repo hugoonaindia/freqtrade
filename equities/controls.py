@@ -67,6 +67,12 @@ class Controls:
                 or type(budget) not in (int, float)
             ):
                 raise ValueError("Usa de 1 a 8 símbolos y presupuesto positivo.")
+            if getattr(self.engine, "campaign", None) and (
+                self.engine.broker.get("/v2/positions") or self.engine._orders()
+            ):
+                raise ValueError(
+                    "No cambies el universo con posiciones u órdenes de campaña abiertas."
+                )
             Engine(self.engine.broker, symbols, budget, strategy=payload["strategy"])
             with self.engine.lock:
                 previous = (
@@ -106,13 +112,20 @@ class Controls:
 
     def start(self, selection):
         with self.lock:
-            if not self.engine.entries_enabled:
-                raise ValueError("Entradas bloqueadas. Usa Cerrar posiciones Paper.")
             self._idle()
             self._selection(selection)
+            if hasattr(self.engine, "arm"):
+                self.engine.arm()
+            if not self.engine.entries_enabled:
+                raise ValueError("Entradas bloqueadas. Usa Cerrar posiciones Paper.")
             if not self.engine.broker.configured:
                 raise ValueError("Faltan claves Alpaca Paper.")
-            self._save(auto=True)
+            try:
+                self._save(auto=True)
+            except Exception:
+                if hasattr(self.engine, "disarm"):
+                    self.engine.disarm()
+                raise
             self.event = threading.Event()
             self.automation = Automation(enabled=True)
             self.worker = threading.Thread(target=self._run, daemon=True)
@@ -122,6 +135,8 @@ class Controls:
     def _run(self):
         self.automation.run(self.engine, self.event)
         if self.automation.snapshot()["state"] == "error":
+            if hasattr(self.engine, "disarm"):
+                self.engine.disarm()
             with self.lock:
                 with self.automation.lock:
                     self.automation.enabled = False
@@ -133,6 +148,8 @@ class Controls:
     def stop(self):
         with self.lock:
             self.event.set()
+            if hasattr(self.engine, "disarm"):
+                self.engine.disarm()
             with self.automation.lock:
                 self.automation.enabled = False
             self._save(auto=False)
@@ -155,6 +172,13 @@ class Controls:
             self._idle()
             return self.engine.close_positions()
 
+    def reset_campaign(self):
+        with self.lock:
+            self._idle()
+            if not hasattr(self.engine, "reset_campaign"):
+                raise ValueError("Este motor no usa campañas de riesgo.")
+            return self.engine.reset_campaign()
+
     def clear_history(self):
         with self.lock:
             previous = self.history_since
@@ -170,12 +194,11 @@ class Controls:
         with self.lock:
             if not self.history_since:
                 return orders
-            cutoff = datetime.fromisoformat(self.history_since.replace("Z", "+00:00"))
+            cutoff = datetime.fromisoformat(self.history_since)
             return [
                 o
                 for o in orders
-                if o.get("created_at")
-                and datetime.fromisoformat(o["created_at"].replace("Z", "+00:00")) >= cutoff
+                if o.get("created_at") and datetime.fromisoformat(o["created_at"]) >= cutoff
             ]
 
     def close(self):

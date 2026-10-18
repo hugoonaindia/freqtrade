@@ -1,5 +1,7 @@
 # Backtesting de bolsa
 
+El panel permite elegir «Mi perfil», con capital disponible y stops del 2%, o el perfil histórico de presupuesto fijo. En CLI usa `--profile swing`. Las reglas del perfil nuevo y sus límites de simulación diaria están en [Perfil autónomo Paper](autonomous-paper.md). Los detalles de presupuesto fijo descritos más abajo corresponden al perfil `budget`.
+
 En panel local, «Laboratorio histórico» ejecuta las seis estrategias con históricos Alpaca IEX, de forma independiente de la estrategia Paper. No envía órdenes ni cambia configuración de automatización. El trabajo corre en un hilo y cliente de datos propios; solo permite un backtest simultáneo y conserva último informe en memoria hasta reiniciar o comenzar otro. Descarga JSON para conservarlo.
 
 ## Uso

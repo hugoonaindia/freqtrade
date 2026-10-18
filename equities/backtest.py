@@ -21,9 +21,12 @@ class Config:
     budget: float = 500
     fee_bps: float = 5
     slippage_bps: float = 5
+    profile: str = "budget"
 
     def __post_init__(self):
         try:
+            if self.profile not in ("budget", "swing"):
+                raise ValueError
             first, last = date.fromisoformat(self.start), date.fromisoformat(self.end)
             if first > last or (last - first).days > 3660:
                 raise ValueError
@@ -40,7 +43,7 @@ class Config:
 
 
 def session_date(bar):
-    stamp = datetime.fromisoformat(bar["t"].replace("Z", "+00:00"))
+    stamp = datetime.fromisoformat(bar["t"])
     if stamp.tzinfo is None:
         raise ValueError("Barras requieren zona horaria.")
     return stamp.astimezone(NY).date().isoformat()
@@ -154,6 +157,10 @@ def past_bars(by_date, day):
 def simulate(histories, config, strategy):
     if strategy not in STRATEGIES:
         raise ValueError("Estrategia desconocida.")
+    if config.profile == "swing":
+        from .swing_backtest import simulate_swing
+
+        return simulate_swing(histories, config, strategy)
     universe, days = prepare(histories, config, STRATEGIES[strategy]["bars"])
     portfolio = Portfolio(config)
     for day in days:
@@ -250,18 +257,35 @@ def compare(histories, config):
         "actual_end": days[-1],
         "strategies": strategies,
         "benchmarks": benchmarks,
-        "assumptions": [
+        "assumptions": (
+            [
+                "Perfil swing: capital disponible, stop individual 2% y límite global 2% inicial.",
+                "Entrada limitada aproximada con cierre anterior; sin quotes históricos.",
+                "No reproduce cancelación tras 120 segundos ni ejecución intradía de Alpaca.",
+                "Stop individual usa mínimo diario; con gap se ejecuta al peor precio de apertura.",
+                "Límite global se comprueba en apertura y cierre; salida en próxima apertura.",
+                "Si una vela admite varios recorridos, se prioriza la ejecución del stop.",
+                "Las referencias mantienen sus asignaciones originales y no usan stops.",
+            ]
+            if config.profile == "swing"
+            else []
+        )
+        + [
             "Precios ajustados por splits; dividendos, impuestos e interés de efectivo excluidos.",
-            "Cantidades enteras en unidades ajustadas; "
-            "no reconstruye cantidades nominales de splits.",
-            "Señal de sesión anterior; ejecución teórica en apertura siguiente con costes.",
-            "Presupuesto de entrada estimado con cierre previo; gaps pueden superar ese importe.",
+            (
+                "Cantidades enteras en unidades ajustadas; "
+                "no reconstruye cantidades nominales de splits."
+            ),
+            "Señal de sesión anterior; simulación de ejecución con costes.",
+            "Perfil presupuesto: entrada estimada; los gaps pueden superar el importe.",
             "Caídas calculadas con patrimonio al cierre; no representan mínimo intradía.",
             "Universo elegido hoy: posible sesgo de supervivencia.",
             "Dos mitades son diagnóstico temporal, no validación fuera de muestra ni optimización.",
             "Posiciones finales valoradas a cierre; no se fuerza venta ni coste de liquidación.",
             "Regímenes: retorno previo de 20 sesiones de cesta equiponderada; umbrales +/-2%.",
-            "Captura diaria: cociente de rentabilidades medias "
-            "en días de referencia positivos/negativos.",
+            (
+                "Captura diaria: cociente de rentabilidades medias "
+                "en días de referencia positivos/negativos."
+            ),
         ],
     }

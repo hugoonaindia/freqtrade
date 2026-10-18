@@ -86,6 +86,7 @@ def make_server(broker, engine, port, auto=False, automation=None, backtests=Non
                     return self.send(404, {"error": "No encontrado"})
                 lifecycle = controls.snapshot()
                 settings = {
+                    "risk": engine.risk_snapshot() if hasattr(engine, "risk_snapshot") else None,
                     "strategies": STRATEGIES,
                     **(engine.selection() if engine else {"strategy": "sma", "revision": 0}),
                     "symbols": engine.symbols if engine else [],
@@ -171,6 +172,7 @@ def make_server(broker, engine, port, auto=False, automation=None, backtests=Non
                 "/api/settings",
                 "/api/paper/start",
                 "/api/paper/stop",
+                "/api/paper/reset",
                 "/api/positions/close",
                 "/api/history/clear",
             ):
@@ -184,6 +186,10 @@ def make_server(broker, engine, port, auto=False, automation=None, backtests=Non
                     return self.start_backtest(payload)
                 if self.path == "/api/settings":
                     return self.send(200, controls.configure(payload))
+                if self.path == "/api/paper/reset":
+                    if payload != {"confirm": True}:
+                        return self.send(400, {"error": "Confirma revisión y cierre de campaña."})
+                    return self.send(200, controls.reset_campaign())
                 if self.path == "/api/paper/start":
                     return self.send(200, controls.start(payload))
                 if self.path == "/api/positions/close":

@@ -1,76 +1,57 @@
 # Bolsa con Alpaca Paper
 
-Este repositorio incorpora `equities`, una aplicación independiente para acciones estadounidenses mediante Alpaca Paper. **No convierte el motor CCXT de Freqtrade ni hace compatibles sus estrategias, FreqAI, backtesting o FreqUI con acciones.** Dispone de su propio panel web local y seis estrategias de ejemplo.
+`equities` es una aplicación independiente para acciones estadounidenses, con panel web, seis estrategias base y laboratorio histórico. No convierte el motor CCXT ni FreqAI en sistemas de acciones.
 
 ## Arranque
 
-Desde la raíz del proyecto, con Python 3.11 o posterior. En Windows instala primero `python -m pip install tzdata` para disponer de la zona horaria de Nueva York:
+Desde la raíz del proyecto, con Python 3.11 o posterior:
 
 ```sh
-python3 -m equities
+python -m equities
 ```
 
-Abre http://127.0.0.1:8081. No requiere instalar dependencias de Freqtrade. El panel permite consultar cuenta, posiciones, últimas 100 órdenes, seleccionar estrategia, previsualizar señales con sus motivos y ejecutar un ciclo Paper. No envía órdenes al iniciar. Solo escucha en localhost; usa exactamente esa dirección IP.
+En Windows instala primero `python -m pip install tzdata`. Abre `http://127.0.0.1:8081`. No necesita instalar las dependencias del motor cripto. En macOS también puedes usar `Abrir Bolsa.command`.
 
-Alternativa en macOS: doble clic en `Abrir Bolsa.command`.
+## Conexión
 
-## Credenciales
-
-Se leen desde `.secrets/alpaca.json`, excluido de Git, con permisos de propietario:
+Las claves se leen de `.secrets/alpaca.json`, excluido de Git:
 
 ```json
 {"key": "TU_CLAVE_PAPER", "secret": "TU_SECRETO_PAPER"}
 ```
 
-También admite `APCA_API_KEY_ID` y `APCA_API_SECRET_KEY` en entorno. Nunca uses claves reales: el destino de operaciones está fijado a `https://paper-api.alpaca.markets`. No existe opción para cambiar a dinero real. Claves y respuestas completas de autenticación no se envían al navegador.
+También se admiten `APCA_API_KEY_ID` y `APCA_API_SECRET_KEY`. El destino de operaciones está fijado a Alpaca Paper. Las claves se cargan al iniciar; reinicia tras cambiarlas. No se envían al navegador.
 
-## Estrategias disponibles
+## Tu perfil autónomo
 
-```sh
-python3 -m equities --strategy sma --symbols AAPL,MSFT --budget 500 --port 8081
-```
+Consulta [Perfil autónomo Paper de varios días](autonomous-paper.md) para las reglas completas:
 
-| Opción `--strategy` | Entrada | Salida | Historial mínimo |
-| --- | --- | --- | --- |
-| `sma` | Media 5 cruza de abajo hacia arriba media 20 | Cruce inverso | 21 sesiones |
-| `mean_reversion` | Z-score de 20 cierres ≤ −2 | Cierre alcanza media de 20 | 20 sesiones |
-| `bollinger` | Cierre previo bajo banda inferior 20/2 y actual vuelve dentro | Cierre alcanza banda media; salida tiene prioridad ante recuperación que sobrepase media | 21 sesiones |
-| `breakout` | Cierre supera máximo de **20 sesiones anteriores**, excluyendo actual | Cierre pierde mínimo de 10 anteriores | 21 sesiones |
-| `momentum` | Mayor rentabilidad positiva de 63 sesiones del universo configurado | Vende posiciones que dejan de ser ganadoras; sale de todas si ninguna rentabilidad positiva | 64 sesiones por símbolo |
-| `macd` | MACD 12/26 cruza hacia arriba señal EMA9 | Cruce inverso | 35 sesiones |
+- Hasta el 100% del capital disponible, sin apalancamiento. Reparto entre símbolos; momentum asigna al líder. Redondeo a acciones enteras y margen operativo del 1%.
+- Stop individual del 2% mediante orden OTO con protección GTC adjunta.
+- Parada global al perder un 2% desde el patrimonio de activación. Referencia y bloqueo se conservan entre reinicios.
+- Señales cada 60 segundos y supervisor de riesgo cada 30 segundos mientras el proceso siga abierto.
+- Reinicio en pausa. GO PAPER registra o reanuda la campaña; `--auto` se conserva por compatibilidad y no habilita entradas al arrancar.
 
-SMA requiere **cruce nuevo**: estar por encima no basta. Esto sustituye regla inicial de estado de medias. Cruces desde igualdad cuentan. MACD usa EMA inicializada con media simple de primer período. Z-score y bandas usan desviación estándar poblacional; sin dispersión mantienen posición. Ruptura exige máximos/mínimos válidos, no solo cierres.
+La primera campaña exige cuenta Paper sin posiciones ni órdenes. Parar pausa entradas y solicita cancelar compras pendientes en el siguiente ciclo de supervisión; mantiene el supervisor y los stops. El botón de cierre solicita cancelar órdenes y liquidar, confirmando antes las cancelaciones. El panel muestra umbrales, estado y diario.
 
-Momentum compara símbolos configurados, no busca automáticamente todo mercado. Decide en cada nueva sesión diaria; empates se resuelven por símbolo alfabético. Exige mismas 64 fechas de sesión, sin duplicados y en orden, para todos símbolos. Si falta historial válido o fechas no coinciden, no rota. Órdenes abiertas de cada símbolo siguen bloqueando sus operaciones. Una venta enviada no aporta efectivo a compras del mismo ciclo: puede requerir otro ciclo cuando Alpaca refleje ejecución.
+La selección y los símbolos se guardan. No se permite cambiar el universo con posiciones u órdenes abiertas. Cotizaciones de entrada antiguas, spreads superiores al 1%, falta de protección o respuestas ambiguas bloquean nuevas entradas. No borres los archivos de `.equities-state` para reintentar una orden.
 
-Selector del panel cambia estrategia de sesión **sin enviar órdenes** y limpia análisis anterior. Vista previa y ejecución incluyen estrategia y revisión de selección; motor las comprueba bajo mismo bloqueo que ciclo. Si otra pestaña cambia selección, petición antigua se rechaza con HTTP 409, incluso si después vuelve a estrategia original. Peticiones sin selección reciben HTTP 400. Se requiere recargar pestañas anteriores a esta actualización. No combina seis estrategias ni crea seis carteras. Selección no se guarda: reiniciar recupera `--strategy` o `sma` por defecto. Con `--auto` selector queda bloqueado. Estrategia seleccionada puede vender posiciones preexistentes de símbolos configurados: usa cuenta Paper dedicada.
+## Estrategias base
 
-Símbolos predeterminados son ejemplos técnicos, no recomendaciones. Solo posiciones largas, sin incremento de posición existente, compras con efectivo y acciones enteras. Una venta puede dejar resto fraccionario. Todas estrategias son ejemplos sin rentabilidad validada, stop-loss, límite global de pérdidas ni evaluación fiscal. Backtester disponible en laboratorio del panel y CLI; consulta [Backtesting de bolsa](backtesting-equities.md).
+SMA 5/20 y MACD 12/26/9 operan cruces nuevos; reversión a la media usa z-score de 20 cierres; Bollinger exige recuperar la banda inferior; ruptura compara máximos de 20 sesiones y mínimos de 10; momentum elige el líder positivo de 63 sesiones, con fechas alineadas y desempate alfabético. Son ejemplos sin rentabilidad validada. Elige y evalúa tus reglas antes de activar.
 
-Reloj de Alpaca debe indicar sesión regular abierta al ejecutar y antes de enviar cada orden. Calendario oficial determina última sesión completada, incluidos festivos y cierres anticipados. Cada símbolo debe tener exactamente cierre de esa sesión; si falta, no opera. Con mercado abierto excluye día en curso; vista previa tras cierre puede usar sesión recién terminada cuando sus datos ya estén disponibles. Si calendario falla, no opera. Consulta últimos 400 días naturales con barras ajustadas IEX; rechaza respuestas paginadas.
+El laboratorio permite comparar las seis estrategias en el perfil swing o con presupuesto fijo. Consulta [Backtesting de bolsa](backtesting-equities.md). El presupuesto fijo no limita el capital del perfil autónomo.
 
-Presupuesto es estimación por nueva posición, basada en cierre anterior y margen del 5%; órdenes de mercado pueden ejecutarse a otro precio. Compras se limitan al menor entre efectivo libre de reservas, poder de compra y poder de compra sin margen. Descuenta parte pendiente de compras limitadas y reserva importe completo de órdenes por importe nominal. Si una compra pendiente tiene coste desconocido o faltan datos monetarios, bloquea nuevas compras; ventas de posiciones largas siguen permitidas. Nunca suma poder de compra con margen al efectivo. Feed IEX no representa todas operaciones de todas bolsas; permisos dependen de cuenta Alpaca.
+## Límites
 
-## Automatización opcional
+El 2% es un umbral, no una pérdida máxima garantizada. Un stop puede ejecutarse peor por gaps, falta de liquidez, suspensiones o retrasos. No protege fuera de sesión regular. La supervisión global necesita equipo despierto, red y proceso abierto; los stops GTC permanecen en Alpaca al cerrar la app. Usa cuenta Paper dedicada y evita movimientos externos durante una campaña.
 
-```sh
-python3 -m equities --auto --symbols AAPL,MSFT --budget 500
-```
+Las intenciones de entrada se guardan antes del envío y no se reintentan tras respuestas ambiguas. El cierre de posiciones pendiente de confirmación requiere revisión antes de repetirlo. Un bloqueo de proceso evita dos instancias en esta carpeta.
 
-Evalúa cada 60 segundos mientras proceso sigue abierto, con estrategia elegida mediante `--strategy`. No inicia con sistema. Cualquier error detiene trabajador automático. API y panel publican estado detenido y aviso incluso si cuenta no responde; panel actualiza estado cada 15 segundos. Revisa órdenes en Alpaca antes de reiniciar. Sin `--auto`, solo opera al pulsar botón de ejecución del panel.
-
-Órdenes abiertas bloquean nuevas órdenes del mismo símbolo. Identificador determinista por símbolo, sesión y dirección, compartido entre estrategias para evitar duplicados al cambiar selección, permite rechazar duplicados en Alpaca. Intenciones se guardan antes del envío en `.equities-state/submissions.json`; un timeout no se reintenta automáticamente. No borres ese archivo para reintentar sin reconciliar con Alpaca. Un bloqueo de proceso impide dos instancias en esta carpeta; no compartas cuenta con otras copias ejecutándose.
-
-## Verificación
+## Pruebas
 
 ```sh
-python3 -m unittest discover -s tests_equities
+python -m unittest discover -s tests_equities
 ```
 
-Pruebas aisladas cubren seis reglas, calentamiento de indicadores, clasificación de momentum, cambio de estrategia, selector HTTP y límites de efectivo, sesión cerrada, rechazo de cripto, posiciones, señales, persistencia, errores de red, endpoint Paper y protecciones HTTP. Comprobación real de cuenta y datos es independiente: pruebas unitarias no prueban ejecución ni aceptación de órdenes del bróker.
-
-Referencias oficiales: [Paper Trading](https://docs.alpaca.markets/us/docs/paper-trading), [órdenes](https://docs.alpaca.markets/us/docs/working-with-orders), [datos](https://docs.alpaca.markets/us/docs/about-market-data-api).
-
-## Backtesting
-
-Disponible en «Laboratorio histórico» del panel, independiente de Paper. Compara seis estrategias y reducción de pérdidas. Consulta [reglas, métricas y límites](backtesting-equities.md).
+Las pruebas usan un bróker simulado y no envían órdenes a Alpaca.

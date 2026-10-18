@@ -24,4 +24,4 @@ No ejecutar al mismo tiempo el lanzador del repositorio y la aplicación. El pue
 
 ## Modo de cierre manual
 
-Por petición del usuario, arranque automático y operación por estrategia desactivados. Entradas bloqueadas también en bróker. Panel permite consultar señales y cerrar posiciones largas de acciones de toda cuenta Paper con sesión abierta. El cierre usa liquidación nativa de posición, no órdenes de venta con cantidad libre; símbolos con órdenes pendientes se omiten. Pulsar botón no garantiza ejecución inmediata: revisar respuesta y órdenes Alpaca.
+El motor usa el perfil autónomo de varios días con stops individuales del 2% y límite global del 2% desde activación. Reinicia con entradas en pausa y conserva el capital de referencia; GO PAPER habilita las entradas protegidas. La supervisión global requiere el proceso abierto y conexión. Los stops GTC permanecen alojados en Alpaca. Consulta [Perfil autónomo Paper](../../docs/autonomous-paper.md).

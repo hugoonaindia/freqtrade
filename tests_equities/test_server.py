@@ -274,6 +274,7 @@ class StrategyServerTests(ServerTests):
             "/api/settings",
             "/api/paper/start",
             "/api/paper/stop",
+            "/api/paper/reset",
             "/api/history/clear",
             "/api/positions/close",
         ]:

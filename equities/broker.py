@@ -1,6 +1,7 @@
 """Bounded HTTPS requests to fixed Alpaca paper and stock-data endpoints."""
 
 import json
+import math
 import os
 import ssl
 from urllib.error import HTTPError, URLError
@@ -19,6 +20,7 @@ class Alpaca:
     def __init__(self, credentials=None):
         credentials = credentials or credentials_path()
         saved = json.loads(credentials.read_text()) if credentials.exists() else {}
+        self.allow_protected_entries = False
         self.key = os.environ.get("APCA_API_KEY_ID") or saved.get("key")
         self.secret = os.environ.get("APCA_API_SECRET_KEY") or saved.get("secret")
         try:
@@ -35,9 +37,25 @@ class Alpaca:
 
     def request(self, method, path, payload=None, data=False, **params):
         if method == "POST" and path == "/v2/orders" and (payload or {}).get("side") == "buy":
-            raise ValueError(
-                "Órdenes de entrada bloqueadas por usuario. Solo cierre de posiciones."
-            )
+            try:
+                qty = float(payload["qty"])
+                limit = float(payload["limit_price"])
+                stop = float(payload["stop_loss"]["stop_price"])
+                allowed = (
+                    self.allow_protected_entries
+                    and payload.get("order_class") == "oto"
+                    and payload.get("type") == "limit"
+                    and payload.get("time_in_force") == "gtc"
+                    and all(math.isfinite(v) and v > 0 for v in (qty, limit, stop))
+                    and qty.is_integer()
+                    and 0.98 * limit <= stop < limit
+                )
+            except (KeyError, TypeError, ValueError):
+                allowed = False
+            if not allowed:
+                raise ValueError(
+                    "Entradas bloqueadas: requiere campaña activa y stop adjunto del 2%."
+                )
         if not self.configured:
             raise ValueError("Faltan claves Alpaca Paper. Consulta docs/alpaca.md.")
         base = "https://data.alpaca.markets" if data else "https://paper-api.alpaca.markets"

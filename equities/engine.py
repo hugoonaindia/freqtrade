@@ -124,7 +124,7 @@ class Engine:
             timeframe="1Day",
             start=(today - timedelta(days=400)).isoformat(),
             end=(expected_session + timedelta(days=1)).isoformat(),
-            adjustment="all",
+            adjustment=getattr(self, "history_adjustment", "all"),
             feed="iex",
             sort="asc",
             limit=1000,
