@@ -1,7 +1,6 @@
 """Run with python3 -m equities. No Freqtrade dependencies required."""
 
 import argparse
-import fcntl
 import signal
 import threading
 
@@ -9,6 +8,7 @@ from .broker import Alpaca
 from .controls import Controls
 from .engine import Engine
 from .paths import credentials_path, runtime_root
+from .process_lock import acquire_process_lock
 from .server import make_server
 from .strategies import STRATEGIES
 
@@ -31,9 +31,8 @@ def main(argv=None):
     args = parser.parse_args(argv)
     state_dir = runtime_root() / ".equities-state"
     state_dir.mkdir(mode=0o700, exist_ok=True)
-    lock = (state_dir / "process.lock").open("w")
     try:
-        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        lock = acquire_process_lock(state_dir / "process.lock")
     except BlockingIOError:
         parser.error("Ya hay un proceso de bolsa activo para este proyecto.")
     broker = Alpaca(credentials_path())

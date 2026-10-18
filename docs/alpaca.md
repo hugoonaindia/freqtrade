@@ -4,7 +4,7 @@ Este repositorio incorpora `equities`, una aplicación independiente para accion
 
 ## Arranque
 
-Desde la raíz del proyecto, con Python 3.11 o posterior:
+Desde la raíz del proyecto, con Python 3.11 o posterior. En Windows instala primero `python -m pip install tzdata` para disponer de la zona horaria de Nueva York:
 
 ```sh
 python3 -m equities

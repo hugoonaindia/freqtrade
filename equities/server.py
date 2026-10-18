@@ -60,18 +60,18 @@ def make_server(broker, engine, port, auto=False, automation=None, backtests=Non
                         },
                     )
                 if self.path == "/":
-                    html = Path(__file__).with_name("dashboard.html").read_text()
+                    html = Path(__file__).with_name("dashboard.html").read_text(encoding="utf-8")
                     return self.send(200, html.replace("__TOKEN__", token), "text/html")
                 if self.path == "/dashboard.js":
                     return self.send(
                         200,
-                        Path(__file__).with_name("dashboard_ui.js").read_text(),
+                        Path(__file__).with_name("dashboard_ui.js").read_text(encoding="utf-8"),
                         "text/javascript",
                     )
                 if self.path == "/backtest.js":
                     return self.send(
                         200,
-                        Path(__file__).with_name("backtest_ui.js").read_text(),
+                        Path(__file__).with_name("backtest_ui.js").read_text(encoding="utf-8"),
                         "text/javascript",
                     )
                 if self.path == "/api/backtest":

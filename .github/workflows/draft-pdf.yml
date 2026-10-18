@@ -1,4 +1,9 @@
-on: [push]
+name: Paper Draft
+
+on: [push, workflow_dispatch]
+
+permissions:
+  contents: read
 
 jobs:
   paper:
@@ -6,15 +11,15 @@ jobs:
     name: Paper Draft
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Build draft PDF
-        uses: openjournals/openjournals-draft-action@master
+        uses: openjournals/openjournals-draft-action@af22ceb4b8f9eff6b3a13c05747ccc2f573cf2e6
         with:
           journal: joss
           # This should be the path to the paper within your repo.
           paper-path: docs/JOSS_paper/paper.md
       - name: Upload
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: paper
           # This is the output path where Pandoc will write the compiled

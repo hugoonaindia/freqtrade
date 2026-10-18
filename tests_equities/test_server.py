@@ -4,11 +4,13 @@ import json
 import re
 import threading
 import unittest
+from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from test_engine import Broker
 
+from equities import server
 from equities.engine import Engine
 from equities.server import make_server
 
@@ -32,6 +34,18 @@ class ServerTests(unittest.TestCase):
     def test_dashboard(self):
         with urlopen(self.url) as r:
             self.assertIn("ALPACA PAPER", r.read().decode())
+
+    def test_scripts_are_served_as_utf8(self):
+        for route, filename in [
+            ("/dashboard.js", "dashboard_ui.js"),
+            ("/backtest.js", "backtest_ui.js"),
+        ]:
+            with self.subTest(route=route), urlopen(self.url + route) as response:
+                expected = (
+                    Path(server.__file__).with_name(filename).read_text(encoding="utf-8").encode()
+                )
+                self.assertEqual(response.read(), expected)
+                self.assertIn("charset=utf-8", response.headers["Content-Type"])
 
     def test_setup_status(self):
         with urlopen(self.url + "/api/status") as r:

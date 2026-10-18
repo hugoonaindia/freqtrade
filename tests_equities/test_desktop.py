@@ -18,7 +18,12 @@ class DesktopTests(unittest.TestCase):
             self.assertEqual(credentials_path(), Path(folder).resolve() / ".secrets/alpaca.json")
 
     def test_frozen_default_uses_application_support(self):
-        with patch.dict("os.environ", {}, clear=True), patch("sys.frozen", True, create=True):
+        home = Path.home()
+        with (
+            patch.dict("os.environ", {}, clear=True),
+            patch("sys.frozen", True, create=True),
+            patch("pathlib.Path.home", return_value=home),
+        ):
             self.assertEqual(
                 runtime_root(), Path.home() / "Library/Application Support/Freqtrade Bolsa"
             )

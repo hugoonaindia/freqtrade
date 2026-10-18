@@ -1,0 +1,33 @@
+name: Equities tests
+
+on:
+  push:
+    branches: [main, develop, stable]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ['3.12', '3.13', '3.14']
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7
+        with:
+          python-version: ${{ matrix.python }}
+          activate-environment: true
+          enable-cache: false
+      - name: Install timezone data
+        run: uv pip install tzdata
+      - name: Test equities with native file encoding
+        run: python -m unittest discover -s tests_equities -v
+        env:
+          PYTHONUTF8: '0'
