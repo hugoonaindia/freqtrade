@@ -1,6 +1,6 @@
 # Rendimiento · revisión del 18 de octubre de 2026
 
-Se midieron y optimizaron el panel Alpaca, los cálculos históricos, las lecturas del ciclo Paper y el empaquetado del repositorio. El motor cripto conserva sus optimizaciones existentes; no se ha certificado su rendimiento con datos reales en esta revisión.
+Se midieron y optimizaron el panel Alpaca, los cálculos históricos, las lecturas del ciclo Paper y el empaquetado del repositorio. El motor cripto se retiró posteriormente para dejar esta aplicación independiente; sigue recuperable en el historial Git.
 
 ## Mediciones
 
@@ -22,7 +22,7 @@ El panel se midió con tres consultas de lectura por versión; la latencia depen
 - Lecturas del panel en paralelo, con un máximo de cuatro trabajadores. Las peticiones simultáneas comparten únicamente la lectura en curso; el siguiente sondeo obtiene datos nuevos. No se cachean lecturas de riesgo ni órdenes.
 - El ciclo Paper reutiliza sus lecturas frescas de reconciliación únicamente cuando no ha realizado escrituras al bróker. No reutiliza datos de ciclos anteriores.
 - HTML y scripts cargados una vez por proceso; tablas y catálogo de estrategias se actualizan al cambiar su contenido. Las pestañas ocultas dejan de sondear el estado del panel; el supervisor sigue ejecutándose en el servidor.
-- Se excluyen 11.409 archivos de documentación generada (985,5 MiB) del contexto Docker y de las descargas de CI. La comprobación de acciones solo necesita sus carpetas de código y pruebas. La documentación permanece en Git.
+- Se excluyen 11.409 archivos de documentación generada (985,5 MiB) del contexto Docker y de las descargas de CI. La comprobación de acciones solo necesita sus carpetas de código y pruebas. La documentación generada se retiró posteriormente del árbol de trabajo y sigue recuperable en el historial Git.
 - El contexto Docker excluye también claves, sesiones y builds locales.
 
 ## Validación y reproducción

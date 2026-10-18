@@ -2,7 +2,7 @@
 
 Aplicación nativa para Apple Silicon, macOS 12 o posterior. Incluye intérprete Python, motor de acciones Alpaca Paper, panel y backtester. No incluye motor cripto de Freqtrade ni credenciales.
 
-Construcción desde raíz del proyecto, con Python 3.11, PyInstaller 6, certifi, Pillow y herramientas de Xcode instalados:
+Construcción desde raíz del proyecto, con Python 3.12 o posterior, PyInstaller 6, certifi, Pillow y herramientas de Xcode instalados:
 
 ```sh
 python3 packaging/macos/build.py

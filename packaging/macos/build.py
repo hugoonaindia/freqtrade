@@ -31,7 +31,7 @@ subprocess.run(['xcrun', 'swiftc', str(ROOT / 'packaging/macos/Launcher.swift'),
                 '-framework', 'Cocoa', '-framework', 'WebKit'], check=True)
 shutil.copytree(BUILD / 'dist/equities-backend', resources / 'backend', symlinks=True)
 from PIL import Image
-Image.open(ROOT / 'freqtrade/rpc/api_server/ui/favicon.ico').convert('RGBA').resize((1024, 1024)).save(resources / 'AppIcon.icns')
+Image.open(ROOT / 'packaging/macos/favicon.ico').convert('RGBA').resize((1024, 1024)).save(resources / 'AppIcon.icns')
 info = {
     'CFBundleIdentifier': 'local.freqtrade.bolsa', 'CFBundleExecutable': 'FreqtradeBolsa',
     'CFBundleName': 'Freqtrade Bolsa', 'CFBundleDisplayName': 'Freqtrade Bolsa',
