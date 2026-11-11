@@ -43,15 +43,22 @@ class Broker:
         if path.startswith("/v2/assets/"):
             return self.asset
         if path.endswith("/bars"):
+            dates = []
+            day = self.now - timedelta(days=1)
+            while len(dates) < len(self.closes):
+                if day.weekday() < 5:
+                    dates.append(day)
+                day -= timedelta(days=1)
             return {
                 "bars": [
                     {
-                        "t": (self.now - timedelta(days=len(self.closes) - i)).isoformat(),
+                        "t": day.isoformat(),
+                        "o": c,
                         "c": c,
                         "h": c + 0.5,
                         "l": c - 0.5,
                     }
-                    for i, c in enumerate(self.closes)
+                    for day, c in zip(reversed(dates), self.closes, strict=True)
                 ],
                 "next_page_token": None,
             }

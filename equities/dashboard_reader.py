@@ -4,17 +4,41 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, wait
 from datetime import UTC, datetime
 
+from .broker import Alpaca
+from .paths import credentials_path
+
 
 class DashboardReader:
-    def __init__(self, broker):
-        self.broker = broker
+    def __init__(self, broker_or_factory):
+        # Support both broker instance (backward compat) and broker_factory callable
+        if callable(broker_or_factory):
+            self.broker_factory = broker_or_factory
+            self._broker = None  # Lazy initialization
+        else:
+            self.broker_factory = None
+            self._broker = broker_or_factory
         self.executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="dashboard-read")
         self.condition = threading.Condition()
         self.loading = False
         self.result = None
         self.error = None
+        self._init_error = None
+
+    @property
+    def broker(self):
+        """Lazy broker initialization with error capture."""
+        if self._broker is None and self.broker_factory is not None:
+            try:
+                self._broker = self.broker_factory()
+            except Exception as exc:
+                self._init_error = exc
+                raise
+        return self._broker
 
     def load(self):
+        # Check for initialization error first
+        if self._init_error:
+            raise self._init_error
         with self.condition:
             if self.loading:
                 while self.loading:

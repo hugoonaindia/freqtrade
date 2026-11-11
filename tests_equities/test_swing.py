@@ -297,3 +297,98 @@ class SwingTests(unittest.TestCase):
             },
         )
         self.assertEqual(len(broker.opener.calls), 1)
+
+    def test_ledger_failure_blocks_entries_but_not_global_exit(self):
+        self.engine.arm()
+        self.engine.analytics.record = Mock(side_effect=OSError("disk unavailable"))
+        self.engine.analytics.order = Mock(side_effect=OSError("disk unavailable"))
+        self.broker.positions = [position()]
+        self.broker.equity = 979
+        self.engine.monitor()
+        self.assertTrue(self.engine.campaign["tripped"])
+        self.assertFalse(self.engine.entries_enabled)
+        self.assertIn("/v2/positions/AAPL", self.broker.deleted)
+        self.assertIsNotNone(self.engine.risk_snapshot()["monitor_error"])
+
+    def test_ledger_failure_does_not_block_missing_protective_stop(self):
+        self.engine.arm()
+        self.engine.analytics.record = Mock(side_effect=OSError("disk unavailable"))
+        self.engine.analytics.order = Mock(side_effect=OSError("disk unavailable"))
+        self.broker.positions = [position()]
+        with self.assertRaises(ValueError):
+            self.engine.monitor()
+        self.assertFalse(self.engine.entries_enabled)
+        self.assertEqual(self.broker.sent[0]["type"], "stop")
+
+    def test_ledger_failure_prevents_new_buy_submission(self):
+        self.engine.arm()
+        self.engine.analytics.record = Mock(side_effect=OSError("disk unavailable"))
+        with self.assertRaises(ValueError):
+            self.engine._submit({"side": "buy", "symbol": "AAPL", "client_order_id": "test"})
+        self.assertEqual(self.broker.sent, [])
+
+    def test_fill_activities_are_deduplicated_and_keep_each_partial(self):
+        self.engine.arm()
+        original = self.broker.get
+        fills = [
+            {
+                "id": "fill-1",
+                "order_id": "entry-1",
+                "symbol": "AAPL",
+                "side": "buy",
+                "qty": "1",
+                "price": "100",
+                "transaction_time": "2026-10-18T14:30:01Z",
+                "type": "partial_fill",
+            },
+            {
+                "id": "fill-2",
+                "order_id": "entry-1",
+                "symbol": "AAPL",
+                "side": "buy",
+                "qty": "2",
+                "price": "100.1",
+                "transaction_time": "2026-10-18T14:30:02Z",
+                "type": "fill",
+            },
+        ]
+
+        def read(path, **params):
+            return fills if path == "/v2/account/activities/FILL" else original(path, **params)
+
+        self.broker.get = read
+        self.engine.capture_order_updates()
+        self.engine.capture_order_updates()
+        self.assertEqual(len(self.engine.risk_snapshot()["fills"]), 2)
+        run = self.engine.campaign["analytics_run_id"]
+        self.assertEqual(
+            sum(e["kind"] == "fill" for e in self.engine.analytics.summary(run)["events"]), 2
+        )
+
+    def test_expired_quote_before_submission_never_reaches_broker(self):
+        from time import monotonic
+
+        self.engine.arm()
+        self.engine.quote_checked["AAPL"] = (monotonic() - 61, 0)
+        with self.assertRaisesRegex(ValueError, "envejecida"):
+            self.engine._submit({"symbol": "AAPL", "side": "buy", "client_order_id": "late"})
+        self.assertEqual(self.broker.sent, [])
+
+    def test_cancel_request_is_not_reported_as_confirmed(self):
+        self.engine.arm()
+        self.engine._cancel_entry(
+            {"id": "entry-1", "client_order_id": "client-1", "symbol": "AAPL"}, "timeout_120s"
+        )
+        row = self.engine.analytics.executions(self.engine.campaign["analytics_run_id"])[0]
+        self.assertIsNotNone(row["cancel_requested_at"])
+        self.assertIsNone(row["canceled_at"])
+
+    def test_unchanged_risk_snapshots_skip_redundant_writes_but_changes_are_immediate(self):
+        self.engine.arm()
+        original = self.engine.analytics.record
+        self.engine.analytics.record = Mock(wraps=original)
+        self.engine._audit("positions", [])
+        self.engine._audit("positions", [])
+        self.assertEqual(self.engine.analytics.record.call_count, 0)  # Already observed during arm.
+        self.engine._audit("positions", [{"symbol": "AAPL", "qty": "1"}])
+        self.assertEqual(self.engine.analytics.record.call_count, 1)

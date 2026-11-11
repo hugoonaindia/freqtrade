@@ -52,20 +52,10 @@ class SelectionTests(unittest.TestCase):
         original = self.broker.get
 
         def history(path, **params):
-            result = original(path, **params)
             if path.endswith("/bars"):
-                from datetime import timedelta
-
                 end = 120 if "MSFT" in path else 110
-                values = [100] * 63 + [end]
-                result["bars"] = [
-                    {
-                        "t": (self.broker.now - timedelta(days=64 - i)).isoformat(),
-                        "c": c,
-                    }
-                    for i, c in enumerate(values)
-                ]
-            return result
+                self.broker.closes = [100] * 63 + [end]
+            return original(path, **params)
 
         self.broker.get = history
         engine = Engine(self.broker, ["AAPL", "MSFT"], 550, strategy="momentum")

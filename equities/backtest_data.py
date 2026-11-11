@@ -4,6 +4,7 @@ from datetime import date, datetime, timedelta
 
 from .backtest import prepare, session_date
 from .guards import NY, completed_session
+from .history_validation import validate_daily, historical_bounds
 
 
 def load_histories(broker, symbols, config, progress=lambda message: None):
@@ -19,6 +20,19 @@ def load_histories(broker, symbols, config, progress=lambda message: None):
     )
     if len(sessions) < 2 or sessions[-1] > last_complete:
         raise ValueError("Período sin suficientes sesiones terminadas; ajusta fechas.")
+    if config.feed == "sip" and sessions[-1] == today.isoformat():
+        closing = next(item["close"] for item in calendar if item["date"] == sessions[-1])
+        close_time = datetime.fromisoformat(sessions[-1] + "T" + closing).replace(tzinfo=NY)
+        if datetime.fromisoformat(clock["timestamp"]) < close_time + timedelta(minutes=16):
+            raise ValueError(
+                "SIP histórico: espera al menos 16 minutos después del cierre para usar la sesión completa, o termina el período en la sesión anterior."
+            )
+    query_bounds = historical_bounds(earliest, min(config.end, last_complete))
+    if config.feed == "sip":
+        query_bounds["end"] = min(
+            datetime.fromisoformat(query_bounds["end"]),
+            datetime.fromisoformat(clock["timestamp"]) - timedelta(minutes=16),
+        ).isoformat()
     output = {}
     for index, symbol in enumerate(symbols):
         progress(f"Descargando {symbol} ({index + 1}/{len(symbols)})")
@@ -31,10 +45,9 @@ def load_histories(broker, symbols, config, progress=lambda message: None):
             params = {
                 "data": True,
                 "timeframe": "1Day",
-                "start": earliest,
-                "end": (date.fromisoformat(config.end) + timedelta(days=1)).isoformat(),
+                **query_bounds,
                 "adjustment": "split",
-                "feed": "iex",
+                "feed": config.feed,
                 "sort": "asc",
                 "limit": 10000,
             }
@@ -59,12 +72,7 @@ def load_histories(broker, symbols, config, progress=lambda message: None):
                 f"{symbol}: historial incompleto; faltan {len(missing)} sesiones. "
                 f"Primera: {missing[0] if missing else 'duplicada o fuera de calendario'}."
             )
-        all_days = sorted(session_date(bar) for bar in bars)
-        expected = sorted(
-            item["date"] for item in calendar if all_days[0] <= item["date"] <= config.end
-        )
-        if all_days != expected:
-            raise ValueError(f"{symbol}: faltan sesiones de calentamiento o hay fechas inválidas.")
+        validate_daily(symbol, bars, calendar=calendar, end=config.end)
         output[symbol] = bars
     prepare(output, config, 64)
     return output

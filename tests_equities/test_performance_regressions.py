@@ -123,8 +123,11 @@ class DashboardReadTests(unittest.TestCase):
             with patch.object(broker, "get", wraps=broker.get) as get:
                 engine.cycle()
                 paths = [call.args[0] for call in get.call_args_list]
-                for path in ["/v2/account", "/v2/orders", "/v2/positions", "/v2/clock"]:
+                for path in ["/v2/account", "/v2/orders", "/v2/positions"]:
                     self.assertEqual(paths.count(path), 1)
+                self.assertEqual(
+                    paths.count("/v2/clock"), 2
+                )  # Recheck time after fetching the quote.
                 broker.equity = 970
                 engine.cycle()
                 self.assertTrue(engine.campaign["tripped"])

@@ -69,3 +69,52 @@ class SwingBacktestTests(unittest.TestCase):
                 main()
             self.assertEqual(loader.call_args.args[2].profile, "swing")
             self.assertTrue(target.exists())
+
+    def test_opening_exit_precedes_a_later_daily_stop(self):
+        from unittest.mock import patch
+
+        data = history([100] * 66)
+        data[65].update(o=100, h=101, l=97, c=100)
+        cfg = Config(
+            start=data[64]["t"][:10],
+            end=data[65]["t"][:10],
+            capital=1000,
+            profile="swing",
+            fee_bps=0,
+            slippage_bps=0,
+        )
+        with patch(
+            "equities.swing_backtest.decide",
+            side_effect=[
+                {"signal": "buy", "reason": "entry"},
+                {"signal": "sell", "reason": "exit"},
+            ],
+        ):
+            report = simulate({"AAPL": data}, cfg, "sma")
+        self.assertEqual(report["trades"][-1]["price"], 100)
+        self.assertEqual(report["trades"][-1]["reason"], "strategy")
+        self.assertEqual(report["metrics"]["final_equity"], 1000)
+
+    def test_gap_stop_precedes_strategy_exit_at_open(self):
+        from unittest.mock import patch
+
+        data = history([100] * 66)
+        data[65].update(o=90, h=101, l=89, c=100)
+        cfg = Config(
+            start=data[64]["t"][:10],
+            end=data[65]["t"][:10],
+            capital=1000,
+            profile="swing",
+            fee_bps=0,
+            slippage_bps=0,
+        )
+        with patch(
+            "equities.swing_backtest.decide",
+            side_effect=[
+                {"signal": "buy", "reason": "entry"},
+                {"signal": "sell", "reason": "exit"},
+            ],
+        ):
+            report = simulate({"AAPL": data}, cfg, "sma")
+        self.assertEqual(report["trades"][-1]["price"], 90)
+        self.assertIn(report["trades"][-1]["reason"], ["account_stop", "position_stop"])

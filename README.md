@@ -4,7 +4,7 @@ Aplicación independiente de acciones estadounidenses: panel local, estrategias 
 
 ## Arrancar en Windows, macOS o Linux
 
-Necesitas Python 3.12 o posterior. Desde esta carpeta:
+Necesitas Python 3.11 o posterior. Desde esta carpeta:
 
 ```sh
 python -m pip install -r requirements.txt
@@ -23,10 +23,12 @@ Los stops no garantizan una pérdida máxima del 2%. La supervisión global nece
 
 ## Documentación
 
+- [Arquitectura modular](docs/arquitectura-modular.md)
 - [Uso y conexión](docs/alpaca.md)
 - [Perfil autónomo y límites](docs/autonomous-paper.md)
 - [Evaluación histórica](docs/backtesting-equities.md)
 - [Mediciones de rendimiento](docs/performance.md)
+- [Instalación y límites para Raspberry Pi](packaging/raspberrypi/README.md)
 - [Empaquetado macOS](packaging/macos/README.md)
 
 ## Pruebas y rendimiento
@@ -44,7 +46,7 @@ El servidor escucha únicamente en localhost. Para usar este Dockerfile en Linux
 
 ## Estructura
 
-`equities/`: motor y panel. `tests_equities/`: pruebas. `docs/`: cuatro guías. `packaging/`: aplicación macOS. `scripts/`: benchmark.
+`equities/`: módulos de la aplicación y panel. `tests_equities/`: pruebas. `docs/`: guías. `packaging/`: despliegue Raspberry Pi y macOS. `scripts/`: benchmark.
 
 ## Licencia e historial
 

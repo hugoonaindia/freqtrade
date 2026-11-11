@@ -4,6 +4,7 @@ import json
 import threading
 from datetime import UTC, datetime
 
+from .durable_state import write_json
 from .automation import Automation
 from .engine import Engine, SelectionChanged
 
@@ -49,10 +50,7 @@ class Controls:
             "history_since": self.history_since,
             "entries_enabled": self.engine.entries_enabled,
         }
-        tmp = self.path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(settings, indent=2) + "\n")
-        tmp.chmod(0o600)
-        tmp.replace(self.path)
+        write_json(self.path, settings)
 
     def configure(self, payload):
         with self.lock:

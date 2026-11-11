@@ -106,7 +106,7 @@ class DataTests(unittest.TestCase):
         jobs.start({"symbols": ["AAPL"], "start": "2025-01-02", "end": "2025-02-28"})
         try:
             with self.assertRaises(RuntimeError):
-                jobs.start({"symbols": ["MSFT"]})
+                jobs.start({"symbols": ["MSFT"], "start": "2025-01-02", "end": "2025-02-28"})
         finally:
             gate.set()
             jobs.wait(10)
@@ -115,3 +115,16 @@ class DataTests(unittest.TestCase):
         self.broker.missing = "2024-12-31"
         with self.assertRaises(ValueError):
             load_histories(self.broker, ["AAPL"], self.config)
+
+    def test_sip_uses_same_feed_and_end_older_than_fifteen_minutes(self):
+        cfg = Config(start="2025-01-02", end="2025-02-28", feed="sip")
+        load_histories(self.broker, ["AAPL"], cfg)
+        calls = [params for path, params in self.broker.calls if path.endswith("/bars")]
+        self.assertTrue(all(params["feed"] == "sip" for params in calls))
+        self.assertTrue(
+            all(
+                datetime.fromisoformat(params["end"])
+                < datetime.fromisoformat("2025-03-03T11:45:00-05:00")
+                for params in calls
+            )
+        )

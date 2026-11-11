@@ -1,6 +1,7 @@
 """Close-to-close portfolio diagnostics; undefined ratios are None, never infinity."""
 
 import math
+import random
 from datetime import date
 from statistics import fmean, stdev
 
@@ -58,6 +59,58 @@ def metrics(curve, capital, trades):
         "closed_trades": len(closed),
         "win_rate_pct": sum(pnl > 0 for pnl in closed) / len(closed) * 100 if closed else None,
         "fees": sum(trade["fee"] for trade in trades),
+    }
+
+
+def bootstrap_metrics(curve, capital, trades, n_bootstrap=1000, confidence=0.95):
+    """Bootstrap confidence intervals for key metrics."""
+    returns = daily_returns(curve, capital)
+    n = len(returns)
+    if n < 2:
+        return {}
+    
+    boot_returns = []
+    boot_max_dd = []
+    boot_final_eq = []
+    
+    for _ in range(n_bootstrap):
+        sample = [random.choice(returns) for _ in range(n)]
+        boot_returns.append(compounded(sample))
+        # Simulate equity curve from bootstrapped returns
+        eq = capital
+        peak = capital
+        max_dd = 0
+        for r in sample:
+            eq *= (1 + r)
+            peak = max(peak, eq)
+            max_dd = max(max_dd, 1 - eq / peak)
+        boot_max_dd.append(max_dd * 100)
+        boot_final_eq.append(eq)
+    
+    alpha = (1 - confidence) / 2
+    lower_idx = int(alpha * n_bootstrap)
+    upper_idx = int((1 - alpha) * n_bootstrap)
+    
+    def percentile(arr, p):
+        arr = sorted(arr)
+        return arr[int(p * len(arr))]
+    
+    return {
+        "return_pct": {
+            "point": (curve[-1]["equity"] / capital - 1) * 100,
+            "ci_lower": percentile(boot_returns, alpha) * 100,
+            "ci_upper": percentile(boot_returns, 1 - alpha) * 100,
+        },
+        "max_drawdown_pct": {
+            "point": max((1 - point["equity"] / max(curve[:i+1], key=lambda x: x["equity"])["equity"]) for i, point in enumerate(curve)) * 100 if len(curve) > 1 else 0,
+            "ci_lower": percentile(boot_max_dd, alpha),
+            "ci_upper": percentile(boot_max_dd, 1 - alpha),
+        },
+        "final_equity": {
+            "point": curve[-1]["equity"],
+            "ci_lower": percentile(boot_final_eq, alpha),
+            "ci_upper": percentile(boot_final_eq, 1 - alpha),
+        },
     }
 
 

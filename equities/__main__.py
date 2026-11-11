@@ -12,6 +12,7 @@ from .process_lock import acquire_process_lock
 from .server import make_server
 from .strategies import STRATEGIES
 from .swing import SwingEngine
+from .broker import Alpaca
 
 
 def main(argv=None):
@@ -41,13 +42,30 @@ def main(argv=None):
             port=saved.get("port", 8081),
         )
     args = parser.parse_args(argv)
+    
+    # Inicializar logging
+    import logging
+    from logging.handlers import RotatingFileHandler
+    log_dir = runtime_root() / ".equities-state"
+    log_dir.mkdir(mode=0o700, exist_ok=True)
+    log_file = log_dir / "app.log"
+    
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+        handlers=[
+            RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=3),
+            logging.StreamHandler()
+        ]
+    )
+    
     state_dir = runtime_root() / ".equities-state"
     state_dir.mkdir(mode=0o700, exist_ok=True)
     try:
         lock = acquire_process_lock(state_dir / "process.lock")
     except BlockingIOError:
         parser.error("Ya hay un proceso de bolsa activo para este proyecto.")
-    broker = Alpaca(credentials_path())
+    broker = Alpaca(credentials_path(), validate=True)
     try:
         engine = SwingEngine(
             broker,
@@ -63,7 +81,7 @@ def main(argv=None):
     stop = threading.Event()
 
     controls = Controls(engine, settings_path=runtime_root() / "settings.json", port=args.port)
-    server = make_server(broker, engine, args.port, controls=controls)
+    server = make_server(broker, engine, args.port, controls=controls, dashboard_broker_factory=lambda: Alpaca(credentials_path()))
 
     def terminate(signum, frame):
         stop.set()
@@ -71,6 +89,7 @@ def main(argv=None):
         threading.Thread(target=server.shutdown, daemon=True).start()
 
     signal.signal(signal.SIGTERM, terminate)
+    signal.signal(signal.SIGINT, terminate)
     controls.stop()  # Restart paused; the campaign baseline and protective orders survive.
 
     def supervise():
@@ -79,6 +98,10 @@ def main(argv=None):
                 engine.monitor()
             except Exception:  # noqa: S110 - Error is exposed by risk_snapshot, no secrets logged.
                 pass
+            try:
+                engine.capture_order_updates()
+            except Exception:
+                pass  # Reconciliation exposes its failure without stopping risk supervision.
             stop.wait(30)
 
     supervisor = threading.Thread(target=supervise, daemon=True)
@@ -96,6 +119,9 @@ def main(argv=None):
         server.server_close()
         controls.close()
         supervisor.join(timeout=20)
+        # Cerrar engine para detener worker de alerts
+        if hasattr(engine, "close"):
+            engine.close()
         lock.close()
 
 

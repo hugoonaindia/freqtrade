@@ -5,10 +5,11 @@ import re
 from bisect import bisect_left
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from zoneinfo import ZoneInfo
 
 from .backtest_metrics import capture, grouped_returns, metrics, protection
+from .history_validation import session_date, validate_daily
 from .strategies import STRATEGIES, decide, rotation
 
 
@@ -24,10 +25,38 @@ class Config:
     fee_bps: float = 5
     slippage_bps: float = 5
     profile: str = "budget"
+    execution: str = "daily"
+    execution_strategy: str = "sma"
+    feed: str = "iex"
+    latency_ms: float = 1000
+    participation_pct: float = 1
+    spread_bps: float = 10
+    quote_sample_ms: float = 100
+    max_position_pct: float = 100
 
     def __post_init__(self):
         try:
             if self.profile not in ("budget", "swing"):
+                raise ValueError
+            if self.feed not in ("iex", "sip"):
+                raise ValueError
+            if self.execution_strategy not in STRATEGIES:
+                raise ValueError
+            if self.execution not in ("daily", "intraday") or (
+                self.execution == "intraday" and self.profile != "swing"
+            ):
+                raise ValueError
+            for key, maximum in (
+                ("latency_ms", 60000),
+                ("participation_pct", 100),
+                ("spread_bps", 100),
+                ("quote_sample_ms", 1000),
+                ("max_position_pct", 100),
+            ):
+                value = getattr(self, key)
+                if isinstance(value, bool) or not math.isfinite(value) or not 0 <= value <= maximum:
+                    raise ValueError
+            if self.participation_pct <= 0:
                 raise ValueError
             first, last = date.fromisoformat(self.start), date.fromisoformat(self.end)
             if first > last or (last - first).days > 3660:
@@ -40,15 +69,8 @@ class Config:
                 raise ValueError
         except (TypeError, ValueError):
             raise ValueError(
-                "Fechas/capital/costes inválidos: máximo 10 años y 100 pb por coste."
+                "Parámetros inválidos: máximo 10 años y 100 pb por coste; intradía requiere perfil swing, latencia 0–60000 ms y participación >0 hasta 100%."
             ) from None
-
-
-def session_date(bar):
-    stamp = datetime.fromisoformat(bar["t"])
-    if stamp.tzinfo is None:
-        raise ValueError("Barras requieren zona horaria.")
-    return stamp.astimezone(NY).date().isoformat()
 
 
 class SessionHistory(Mapping):
@@ -77,21 +99,7 @@ def prepare(histories, config, minimum):
     for symbol, bars in sorted(histories.items()):
         if not re.fullmatch(r"[A-Z][A-Z0-9.\-]{0,9}", symbol):
             raise ValueError("Símbolo no válido.")
-        by_date = {}
-        for bar in bars:
-            day = session_date(bar)
-            if day in by_date:
-                raise ValueError(f"{symbol}: sesión duplicada {day}.")
-            values = {key: float(bar[key]) for key in ("o", "h", "l", "c")}
-            if (
-                any(not math.isfinite(value) or value <= 0 for value in values.values())
-                or not values["l"]
-                <= min(values["o"], values["c"])
-                <= max(values["o"], values["c"])
-                <= values["h"]
-            ):
-                raise ValueError(f"{symbol}: OHLC inválido en {day}.")
-            by_date[day] = {**bar, **values}
+        by_date = validate_daily(symbol, bars)
         days = sorted(day for day in by_date if config.start <= day <= config.end)
         if not days or (sessions is not None and days != sessions):
             raise ValueError(
@@ -251,16 +259,35 @@ def regimes(universe, days):
     return labels
 
 
-def compare(histories, config):
+def compare(histories, config, execution_data=None, *, strategy=None):
     universe, days = prepare(histories, config, max(s["bars"] for s in STRATEGIES.values()))
+    if config.execution == "intraday" and execution_data is None:
+        raise ValueError("Faltan datos intradía: no se sustituye esta prueba por velas diarias.")
+    benchmark_universe = (
+        execution_data.archive["daily"] if config.execution == "intraday" else universe
+    )
     benchmarks = {
-        key: buy_hold(universe, days, config, full)
+        key: buy_hold(benchmark_universe, days, config, full)
         for key, full in [("allocated", False), ("fully_invested", True)]
     }
     labels = regimes(universe, days)
-    strategies = {
-        key: simulate(histories, config, key, _prepared=(universe, days)) for key in STRATEGIES
-    }
+    if strategy is not None and strategy not in STRATEGIES:
+        raise ValueError("Estrategia de ejecución desconocida.")
+    selected = (
+        [strategy]
+        if strategy
+        else ([config.execution_strategy] if config.execution == "intraday" else STRATEGIES)
+    )
+    if config.execution == "intraday":
+        from .execution_replay import simulate_execution
+
+        strategies = {
+            key: simulate_execution(universe, days, config, key, execution_data) for key in selected
+        }
+    else:
+        strategies = {
+            key: simulate(histories, config, key, _prepared=(universe, days)) for key in STRATEGIES
+        }
     for report in [*benchmarks.values(), *strategies.values()]:
         report["regimes"] = grouped_returns(report["curve"], config.capital, labels)
         report["years"] = grouped_returns(report["curve"], config.capital, [d[:4] for d in days])
@@ -287,35 +314,57 @@ def compare(histories, config):
         "actual_end": days[-1],
         "strategies": strategies,
         "benchmarks": benchmarks,
+        "validation": {
+            "quality": "intraday_scenario" if config.execution == "intraday" else "exploratory",
+            "out_of_sample": False,
+            "live_execution_equivalent": False,
+        },
         "assumptions": (
             [
-                "Perfil swing: capital disponible, stop individual 2% y límite global 2% inicial.",
-                "Entrada limitada aproximada con cierre anterior; sin quotes históricos.",
-                "No reproduce cancelación tras 120 segundos ni ejecución intradía de Alpaca.",
-                "Stop individual usa mínimo diario; con gap se ejecuta al peor precio de apertura.",
-                "Límite global se comprueba en apertura y cierre; salida en próxima apertura.",
-                "Si una vela admite varios recorridos, se prioriza la ejecución del stop.",
-                "Las referencias mantienen sus asignaciones originales y no usan stops.",
+                "ESCENARIO INTRADÍA: señales diarias ajustadas por splits; ejecución y cartera en precios nominales raw.",
+                "Se rechazan splits dentro del período; no se inventan ajustes de cantidades.",
+                "Entradas: cotizaciones históricas muestreadas causalmente cada 100 ms, latencia configurada, límite que nunca se supera y caducidad de 120 segundos. El muestreo puede omitir oportunidades breves.",
+                "Liquidez estimada: fracción configurada del tamaño ask y volumen del minuto; no representa cola, profundidad ni fills garantizados.",
+                "Parcial: un fill estimado y cancelación del resto supuesta a los 30 segundos; no se conoce la carrera real entre fill y cancelación.",
+                "Stops con mínimos de un minuto: orden intraminuto desconocido y contabilizado como ambiguo. Gaps salen al precio de apertura con costes.",
+                "Salidas de estrategia usan bid histórico; stops y cierres globales usan spread configurado cuando no hay bid simultáneo.",
+                "La parada de cuenta se muestrea en apertura/cierre de cada minuto; no replica el supervisor de 30 segundos.",
+                "Las métricas principales siguen siendo de cierre diario; se añade caída intradía muestreada en execution.",
+                "Precios raw, dividendos excluidos; referencias usan las mismas sesiones y precios nominales.",
             ]
-            if config.profile == "swing"
-            else []
-        )
-        + [
-            "Precios ajustados por splits; dividendos, impuestos e interés de efectivo excluidos.",
-            (
-                "Cantidades enteras en unidades ajustadas; "
-                "no reconstruye cantidades nominales de splits."
-            ),
-            "Señal de sesión anterior; simulación de ejecución con costes.",
-            "Perfil presupuesto: entrada estimada; los gaps pueden superar el importe.",
-            "Caídas calculadas con patrimonio al cierre; no representan mínimo intradía.",
-            "Universo elegido hoy: posible sesgo de supervivencia.",
-            "Dos mitades son diagnóstico temporal, no validación fuera de muestra ni optimización.",
-            "Posiciones finales valoradas a cierre; no se fuerza venta ni coste de liquidación.",
-            "Regímenes: retorno previo de 20 sesiones de cesta equiponderada; umbrales +/-2%.",
-            (
-                "Captura diaria: cociente de rentabilidades medias "
-                "en días de referencia positivos/negativos."
-            ),
-        ],
+            if config.execution == "intraday"
+            else (
+                [
+                    "Perfil swing: capital disponible, stop individual 2% y límite global 2% inicial.",
+                    "Entrada limitada aproximada con cierre anterior; sin quotes históricos.",
+                    "No reproduce cancelación tras 120 segundos ni ejecución intradía de Alpaca.",
+                    "Stop individual usa mínimo diario; con gap se ejecuta al peor precio de apertura.",
+                    "Límite global se comprueba en apertura y cierre; salida en próxima apertura.",
+                    "Las salidas de apertura preceden a los mínimos posteriores de esa sesión.",
+                    "Orden intradía desconocido: las entradas y stops diarios son aproximaciones.",
+                    "Stop simulado sobre el fill estimado; OTO Paper inicial sobre el límite de compra.",
+                    "Las referencias mantienen sus asignaciones originales y no usan stops.",
+                ]
+                if config.profile == "swing"
+                else []
+            )
+            + [
+                "Precios ajustados por splits; dividendos, impuestos e interés de efectivo excluidos.",
+                (
+                    "Cantidades enteras en unidades ajustadas; "
+                    "no reconstruye cantidades nominales de splits."
+                ),
+                "Señal de sesión anterior; simulación de ejecución con costes.",
+                "Perfil presupuesto: entrada estimada; los gaps pueden superar el importe.",
+                "Caídas calculadas con patrimonio al cierre; no representan mínimo intradía.",
+                "Universo elegido hoy: posible sesgo de supervivencia.",
+                "Dos mitades son diagnóstico temporal, no validación fuera de muestra ni optimización.",
+                "Posiciones finales valoradas a cierre; no se fuerza venta ni coste de liquidación.",
+                "Regímenes: retorno previo de 20 sesiones de cesta equiponderada; umbrales +/-2%.",
+                (
+                    "Captura diaria: cociente de rentabilidades medias "
+                    "en días de referencia positivos/negativos."
+                ),
+            ]
+        ),
     }

@@ -16,10 +16,12 @@ if(d.risk){
 const risk=d.risk;
 el('budget-label').hidden=true;el('cycle').hidden=true;el('settings-form').querySelector('.fields').style.gridTemplateColumns='1fr 1fr';
 el('automation-status').textContent=risk.tripped?'Límite global · bloqueado':running?'Paper autónomo activo':'Entradas en pausa';
-el('run-detail').textContent='GO PAPER usa la estrategia seleccionada, con stops del 2%. Parar pausa entradas; el supervisor sigue vigilando la cuenta mientras la app esté abierta. Cerrar la app detiene el supervisor; conserva los stops en Alpaca.';
+el('run-detail').textContent=d.automation.error||'GO PAPER usa la estrategia seleccionada, con stops del 2%. Parar pausa entradas; el supervisor sigue vigilando la cuenta mientras la app esté abierta. Cerrar la app detiene el supervisor; conserva los stops en Alpaca.';
 el('risk-baseline').textContent=risk.baseline?'Capital al activar: '+money(risk.baseline)+' · umbral de cierre: '+money(risk.account_floor)+'.':'GO PAPER registrará el patrimonio de cuenta como referencia.';
 el('risk-status').textContent=risk.tripped?'Umbral global alcanzado. No se permiten nuevas entradas; revisa la liquidación en Alpaca.':risk.monitor_error||(risk.baseline?'Campaña registrada. Pérdida desde activación: '+(risk.loss_pct==null?'—':risk.loss_pct.toFixed(2)+'%')+'.':'Sin activar. Puedes cambiar estrategia y símbolos antes de iniciar.');
 el('risk-check').textContent=risk.last_check?'Última comprobación: '+new Date(risk.last_check).toLocaleString('es-ES'):'Sin comprobación de campaña todavía.';
+table('execution-fills',risk.fills||[],[['Símbolo','symbol'],['Orden','order_id'],['Instante real','transaction_time'],['Lado','side'],['Cantidad','qty'],['Precio','price'],['Pendiente','leaves_qty'],['Demora (s)','fill_delay_seconds',v=>v==null?'—':Number(v).toFixed(2)],['Deslizamiento (pb)','slippage_bps',v=>v==null?'—':Number(v).toFixed(2)]]);
+table('execution-quality',risk.executions||[],[['Símbolo','symbol'],['Estado','status'],['Envío','sent_at'],['Fill Alpaca','filled_at'],['Demora fill (s)','fill_delay_seconds',v=>v==null?'—':Number(v).toFixed(2)],['Spread (pb)','spread_bps',v=>v==null?'—':Number(v).toFixed(2)],['Deslizamiento (pb)','slippage_bps',v=>v==null?'—':Number(v).toFixed(2)],['Stop inicial desde fill (%)','initial_stop_distance_pct',v=>v==null?'—':Number(v).toFixed(2)],['Fill tras plazo','filled_after_deadline',v=>v?'Sí':'—'],['Cantidad ejecutada','filled_qty'],['Cancelación solicitada','cancel_requested_at'],['Cancelación confirmada','canceled_at']]);
 table('journal',[...(risk.events||[])].reverse(),[['Fecha','time',v=>new Date(v).toLocaleString('es-ES')],['Evento','message']]);
 }else{el('run-detail').textContent=d.automation.error||'Guarda ajustes y pulsa GO PAPER.';}
 

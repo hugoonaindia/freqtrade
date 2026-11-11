@@ -4,6 +4,7 @@ import json
 import os
 import secrets
 import sys
+import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -13,14 +14,17 @@ from .controls import Controls
 from .dashboard_reader import DashboardReader
 from .engine import SelectionChanged
 from .strategies import STRATEGIES
+from .temporal_policy import temporal_policy
+from .broker import Alpaca
+from .paths import credentials_path
 
 
-def make_server(broker, engine, port, auto=False, automation=None, backtests=None, controls=None):  # noqa: C901
+def make_server(broker, engine, port, auto=False, automation=None, backtests=None, controls=None, dashboard_broker_factory=None):  # noqa: C901
     automation = automation or Automation(enabled=auto)
-    backtests = backtests or BacktestJobs()
+    backtests = backtests or BacktestJobs(analytics=getattr(engine, "analytics", None))
     controls = controls or Controls(engine, automation)
     token = secrets.token_urlsafe(32)
-    reader = DashboardReader(broker)
+    reader = DashboardReader(dashboard_broker_factory or broker)
     assets = {
         route: Path(__file__).with_name(filename).read_text(encoding="utf-8")
         for route, filename in [
@@ -73,6 +77,13 @@ def make_server(broker, engine, port, auto=False, automation=None, backtests=Non
                 if self.path in assets:
                     content_type = "text/html" if self.path == "/" else "text/javascript"
                     return self.send(200, assets[self.path], content_type)
+                if self.path == "/api/analytics":
+                    if not hasattr(engine, "analytics"):
+                        return self.send(200, {"enabled": False})
+                    run_id = (engine.campaign or {}).get("analytics_run_id")
+                    return self.send(200, engine.analytics.summary(run_id))
+                if self.path == "/api/backtest/policy":
+                    return self.send(200, temporal_policy())
                 if self.path == "/api/backtest":
                     return self.send(200, backtests.status())
                 if self.path.startswith("/api/backtest/result/"):
@@ -181,6 +192,8 @@ def make_server(broker, engine, port, auto=False, automation=None, backtests=Non
             except (ValueError, UnicodeDecodeError):
                 return self.send(400, {"error": "Formato de petición no válido."})
             try:
+                if self.path == "/api/backtest/policy":
+                    return self.send(200, temporal_policy())
                 if self.path == "/api/backtest":
                     return self.start_backtest(payload)
                 if self.path == "/api/settings":
@@ -241,10 +254,34 @@ def make_server(broker, engine, port, auto=False, automation=None, backtests=Non
                 )
 
     class DashboardServer(ThreadingHTTPServer):
+        slots = threading.BoundedSemaphore(16)
+
+        def get_request(self):
+            request, address = super().get_request()
+            request.settimeout(10)
+            return request, address
+
+        def process_request(self, request, client_address):
+            if not self.slots.acquire(blocking=False):
+                self.shutdown_request(request)
+                return
+            try:
+                super().process_request(request, client_address)
+            except BaseException:
+                self.slots.release()
+                raise
+
+        def process_request_thread(self, request, client_address):
+            try:
+                super().process_request_thread(request, client_address)
+            finally:
+                self.slots.release()
+
         def server_close(self):
             try:
                 super().server_close()
             finally:
                 reader.close()
+                backtests.close()
 
     return DashboardServer(("127.0.0.1", port), Handler)

@@ -47,6 +47,7 @@ class RegressionBroker(Broker):
                 "bars": [
                     {
                         "t": datetime.combine(day, datetime.min.time(), NY).isoformat(),
+                        "o": value,
                         "c": value,
                         "h": value + 0.5,
                         "l": value - 0.5,
@@ -126,7 +127,8 @@ class RegressionTests(unittest.TestCase):
 
     def test_missing_latest_session_blocks_orders(self):
         self.broker.history_end = datetime(2026, 10, 12).date()
-        Engine(self.broker, ["AAPL"], 550).cycle()
+        with self.assertRaises(ValueError):
+            Engine(self.broker, ["AAPL"], 550).cycle()
         self.assertEqual(self.broker.sent, [])
 
     def test_monday_accepts_friday_close(self):
@@ -199,8 +201,8 @@ class RegressionTests(unittest.TestCase):
     def test_after_close_requires_today_bar(self):
         self.broker.open = False
         self.broker.now = self.broker.now.replace(hour=17)
-        row = Engine(self.broker, ["AAPL"], 550).cycle(execute=False)[0]
-        self.assertEqual(row["signal"], "hold")
+        with self.assertRaises(ValueError):
+            Engine(self.broker, ["AAPL"], 550).cycle(execute=False)
         self.assertEqual(self.broker.sent, [])
 
     def test_early_close_accepts_completed_today_bar_in_preview(self):

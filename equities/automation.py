@@ -3,6 +3,8 @@
 import threading
 from datetime import UTC, datetime
 
+from .history_validation import HistoryError
+
 
 class Automation:
     def __init__(self, enabled=False):
@@ -31,12 +33,16 @@ class Automation:
                 with self.lock:
                     self.last_cycle = datetime.now(UTC).isoformat()
                 stop.wait(interval)
-        except Exception:
+        except Exception as exc:
             with self.lock:
                 self.state = "error"
                 self.error = (
-                    "Automatización detenida por error. Revisa órdenes en Alpaca "
-                    "antes de reiniciar."
+                    ("Automatización detenida: " + str(exc))
+                    if isinstance(exc, HistoryError)
+                    else (
+                        "Automatización detenida por error. Revisa órdenes en Alpaca "
+                        "antes de reiniciar."
+                    )
                 )
             return
         with self.lock:

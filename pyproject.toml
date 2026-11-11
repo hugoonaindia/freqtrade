@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "freqtrade-equities"
 version = "1.0.0"
 description = "Independent Alpaca Paper swing trading dashboard and backtester"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 readme = "README.md"
 license = {text = "GPL-3.0"}
 dependencies = ["tzdata>=2024.1"]

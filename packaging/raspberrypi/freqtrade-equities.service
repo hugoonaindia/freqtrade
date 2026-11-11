@@ -1,0 +1,46 @@
+[Unit]
+Description=Alpaca Paper equities supervisor
+Wants=network-online.target time-sync.target
+After=network-online.target time-sync.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=bolsa
+Group=bolsa
+WorkingDirectory=/var/lib/freqtrade-equities
+StateDirectory=freqtrade-equities
+StateDirectoryMode=0700
+Environment=EQUITIES_HOME=/var/lib/freqtrade-equities
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PYTHONUNBUFFERED=1
+Environment=EQUITIES_BACKTEST_MEMORY_MB=384
+ExecStart=/opt/freqtrade-equities/venv/bin/python -B -m equities
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=45
+KillMode=mixed
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LockPersonality=true
+CapabilityBoundingSet=
+TasksMax=64
+LimitNOFILE=256
+MemoryHigh=640M
+MemoryMax=768M
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=freqtrade-equities
+
+[Install]
+WantedBy=multi-user.target

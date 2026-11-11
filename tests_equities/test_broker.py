@@ -61,3 +61,23 @@ class BrokerTests(unittest.TestCase):
         self.assertIsNone(
             NoRedirect().redirect_request(None, None, 302, "", {}, "https://elsewhere.invalid")
         )
+
+    def test_transient_get_is_retried_but_authorization_is_not(self):
+        from unittest.mock import patch
+
+        with (
+            patch.object(
+                self.broker,
+                "request",
+                side_effect=[ValueError("Alpaca HTTP 429: limited"), {"bars": []}],
+            ) as request,
+            patch("equities.broker.sleep"),
+        ):
+            self.assertEqual(self.broker.get("/v2/stocks/AAPL/bars", data=True), {"bars": []})
+            self.assertEqual(request.call_count, 2)
+        with patch.object(
+            self.broker, "request", side_effect=ValueError("Alpaca HTTP 401: unauthorized")
+        ) as request:
+            with self.assertRaises(ValueError):
+                self.broker.get("/v2/account")
+            self.assertEqual(request.call_count, 1)

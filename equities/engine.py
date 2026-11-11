@@ -9,8 +9,18 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from .durable_state import write_json
 from .guards import available_cash, completed_session
+from .history_validation import validate_daily, historical_bounds
 from .strategies import STRATEGIES, decide, rotation
+
+from decimal import ROUND_CEILING, Decimal, ROUND_FLOOR
+
+def stop_price_text(value):
+    """Stop price rounded DOWN (ROUND_FLOOR) to guarantee <=2% loss on sell stops."""
+    number = Decimal(str(value))
+    tick = Decimal("0.01") if number >= 1 else Decimal("0.0001")
+    return str(number.quantize(tick, rounding=ROUND_FLOOR))
 
 
 def signal(closes):
@@ -49,9 +59,7 @@ class Engine:
         self.seen.add(order_id)
         if self.state:
             self.state.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-            tmp = self.state.with_suffix(".tmp")
-            tmp.write_text(json.dumps(sorted(self.seen)))
-            tmp.replace(self.state)
+            write_json(self.state, sorted(self.seen))
 
     def selection(self):
         with self.lock:
@@ -122,8 +130,9 @@ class Engine:
             "/v2/stocks/" + symbol + "/bars",
             data=True,
             timeframe="1Day",
-            start=(today - timedelta(days=400)).isoformat(),
-            end=(expected_session + timedelta(days=1)).isoformat(),
+            **historical_bounds(
+                (today - timedelta(days=400)).isoformat(), expected_session.isoformat()
+            ),
             adjustment=getattr(self, "history_adjustment", "all"),
             feed="iex",
             sort="asc",
@@ -131,26 +140,16 @@ class Engine:
         )
         if response.get("next_page_token"):
             raise ValueError("Datos incompletos; no se opera.")
-        bars = sorted(
-            (
-                v
-                for v in response.get("bars", [])
-                if datetime.fromisoformat(v["t"].replace("Z", "+00:00"))
-                .astimezone(ZoneInfo("America/New_York"))
-                .date()
-                <= expected_session
-            ),
-            key=lambda v: v["t"],
+        bars = response.get("bars", [])
+        calendar = self.broker.get(
+            "/v2/calendar",
+            start=(today - timedelta(days=400)).isoformat(),
+            end=expected_session.isoformat(),
         )
-        if bars:
-            last_date = (
-                datetime.fromisoformat(bars[-1]["t"].replace("Z", "+00:00"))
-                .astimezone(ZoneInfo("America/New_York"))
-                .date()
-            )
-            if last_date != expected_session:
-                return []
-        return bars
+        validated = validate_daily(
+            symbol, bars, calendar=calendar, end=expected_session.isoformat()
+        )
+        return [validated[day] for day in sorted(validated)]
 
     def _cycle(self, execute):  # noqa: C901 - One locked cycle keeps order guards sequential.
         b = self.broker
